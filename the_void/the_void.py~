@@ -1,0 +1,88 @@
+import random
+import networkx as nx
+import matplotlib.pyplot as plt
+
+# dict of thought/idea/question: neighbors
+class Void:
+    def __init__(self):
+        self.things = {}
+
+    def contains(self, thing):
+        return thing in self.things
+
+    # the weight to give to a new thing
+    def new_weight(self):
+        return 1
+
+    # insert a new thing into the void from parent
+    def add(self, thing, parent = None):            
+        if thing not in self.things:
+            self.things[thing] = set([])
+        if parent in self.things:
+            self.things[parent].add(thing)
+            self.things[thing].add(parent)
+
+    # return neighbors of node
+    def neighbors(self, thing):
+        return self.things[thing]
+
+    # return random neighbor (or just random node)
+    def spit(self, thing = None):
+        if not self.things:
+            return ''
+        if thing in self.things and self.things[thing]:
+            return random.choice(list(self.things[thing]))
+        return random.choice(list(self.things.keys())) # chance to random?
+
+    def recap(self):
+        # draw legit graph
+        G = nx.Graph()
+        for thing in self.things:
+            for other in self.things[thing]:
+                G.add_edge(thing, other)
+        nx.draw(G, with_labels=True, font_weight='bold')
+        plt.show()
+
+        # return string of all items num children
+        recap = list(self.things.items())
+        recap.sort(key = lambda x: -len(x[1]))
+        return '\n'.join(map(lambda x: str(x), recap))
+
+    def __str__(self):
+        return self.recap()
+    
+# initiate session
+void = Void()
+old = 'Welcome to The Void'
+
+while True:
+    # spit message and take input
+    new = input("(? for options): " + old + "\n")
+    # options info
+    if new == '?':
+        # TODO: more navigation options? delete?
+        print('''COMMANDS:
+        _ - create new node _ 
+        <RET> - random node
+        /n - print neighbors
+        /_ - go to node _
+        /p - print full recap
+        ''')
+    # special commands start with /
+    elif new and new[0] == '/':
+        if new == '/p':
+            print("\n-------------------------RECAP-------------------------")        
+            print(void.recap() + '\n')
+        elif new == '/n':
+            print(void.neighbors(old))
+        elif void.contains(new[1:]):
+            old = new[1:]
+    # normal input
+    elif new == '':
+        old = void.spit(old)
+    else:
+        for n in new.split('/ '):
+            void.add(n, old)
+        old = void.spit(old)
+
+
