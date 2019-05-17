@@ -1,8 +1,0 @@
-#the_void.py
-# GMT Thu May 16 02:54:30 2019
-# 
-a d b
-c b
-e d
-d
-b
