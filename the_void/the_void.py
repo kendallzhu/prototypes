@@ -48,6 +48,23 @@ class Void:
             return random.choice(list(self.things[thing]))
         return random.choice(list(self.things.nodes)) # chance to random?
 
+    # asks user to choose between until all but one are eliminated
+    def user_pick_node(self):
+        remaining = set(self.things.nodes)
+        while len(remaining) > 1:
+            a, b = remaining.pop(), remaining.pop()
+            print('right now, would you rather explore (1) or (2):')
+            print('(1) ' + str(a))
+            print('(2) ' + str(b))
+            choice = input()
+            while choice not in ['1', '2']:
+                choice = input('enter 1 or 2: ')
+            if choice == '1':
+                remaining.add(a)
+            else:
+                remaining.add(b)
+        return remaining.pop()
+    
     # draw graph in new window
     def draw(self):        
         nx.draw(self.things, with_labels=True, font_weight='bold')
@@ -90,6 +107,7 @@ while True:
         /n - show neighbors
         /p - print list
         /g - draw graph
+        /a - action picker
         /s - save session
         /l - load session
         /q - quit
@@ -115,6 +133,11 @@ while True:
         elif new == '/l':
             name = input('enter name: ')
             void.load(name + '.txt')
+        elif new == '/a':
+            print('let\'s do something!')
+            chosen = void.user_pick_node()
+            print('Your mission is to explore: ' + str(chosen))
+            old = chosen
         elif new == '/q':
             # warn/suggest save?
             break
