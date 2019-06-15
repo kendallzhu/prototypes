@@ -1,0 +1,14 @@
+graph [
+  node [
+    id 0
+    label "flashlight rhythms"
+  ]
+  node [
+    id 1
+    label "angry (comets?) glowy cartoon lightning, serene bg, varying fog levels"
+  ]
+  edge [
+    source 0
+    target 1
+  ]
+]

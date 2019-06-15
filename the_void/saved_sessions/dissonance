@@ -1,0 +1,214 @@
+graph [
+  node [
+    id 0
+    label "tension inside"
+  ]
+  node [
+    id 1
+    label "draw something?"
+  ]
+  node [
+    id 2
+    label "cartoon - make sure you don't __"
+  ]
+  node [
+    id 3
+    label "do things just for momentary availability heuristic of efficiency"
+  ]
+  node [
+    id 4
+    label "why so desperate to get things over with?"
+  ]
+  node [
+    id 5
+    label "might as well die then"
+  ]
+  node [
+    id 6
+    label "or burp..."
+  ]
+  node [
+    id 7
+    label "maybe its time to chill with the burping"
+  ]
+  node [
+    id 8
+    label "yeah"
+  ]
+  node [
+    id 9
+    label "dissonance"
+  ]
+  node [
+    id 10
+    label "happens when the dissonance becomes very visceral"
+  ]
+  node [
+    id 11
+    label "or make weird eye blinking motions"
+  ]
+  node [
+    id 12
+    label "time to chill in gerneral"
+  ]
+  node [
+    id 13
+    label "or make weird body gestures"
+  ]
+  node [
+    id 14
+    label "I'm having a bit of trouble with that"
+  ]
+  node [
+    id 15
+    label "anxiety"
+  ]
+  node [
+    id 16
+    label "physical"
+  ]
+  node [
+    id 17
+    label "uncertainty"
+  ]
+  node [
+    id 18
+    label "drunk with uncertainty"
+  ]
+  node [
+    id 19
+    label "kind of hovering around there"
+  ]
+  node [
+    id 20
+    label "or wake up from the dream"
+  ]
+  node [
+    id 21
+    label "or just chill witht edream and stop tunnel visioning"
+  ]
+  node [
+    id 22
+    label "cuz I am dreaming right now"
+  ]
+  node [
+    id 23
+    label "I really am"
+  ]
+  node [
+    id 24
+    label "do this dream gracefully"
+  ]
+  node [
+    id 25
+    label "become conscious"
+  ]
+  node [
+    id 26
+    label "watch it all collapse"
+  ]
+  edge [
+    source 0
+    target 1
+  ]
+  edge [
+    source 1
+    target 2
+  ]
+  edge [
+    source 2
+    target 3
+  ]
+  edge [
+    source 3
+    target 4
+  ]
+  edge [
+    source 4
+    target 5
+  ]
+  edge [
+    source 4
+    target 15
+  ]
+  edge [
+    source 4
+    target 17
+  ]
+  edge [
+    source 5
+    target 6
+  ]
+  edge [
+    source 5
+    target 14
+  ]
+  edge [
+    source 5
+    target 18
+  ]
+  edge [
+    source 5
+    target 20
+  ]
+  edge [
+    source 5
+    target 26
+  ]
+  edge [
+    source 6
+    target 7
+  ]
+  edge [
+    source 6
+    target 11
+  ]
+  edge [
+    source 6
+    target 13
+  ]
+  edge [
+    source 7
+    target 8
+  ]
+  edge [
+    source 7
+    target 10
+  ]
+  edge [
+    source 7
+    target 12
+  ]
+  edge [
+    source 8
+    target 9
+  ]
+  edge [
+    source 14
+    target 19
+  ]
+  edge [
+    source 15
+    target 16
+  ]
+  edge [
+    source 20
+    target 21
+  ]
+  edge [
+    source 20
+    target 25
+  ]
+  edge [
+    source 21
+    target 22
+  ]
+  edge [
+    source 21
+    target 24
+  ]
+  edge [
+    source 22
+    target 23
+  ]
+]
