@@ -10,116 +10,166 @@ class Void:
     ARCHIVE_DIR = './saved_sessions/archive/'
     def __init__(self):
         self.modified = False
-        self.name = ""
+        self.name = ''
         self.things = nx.Graph()
 
-    # INTERACTIONS
+    # BASIC UTILITIES
+    def empty(self):
+        return not self.things
+    
     def contains(self, thing):
         return thing in self.things
 
+    def neighbors(self, node):
+        return list(self.things[node])
+
+    def delete_node(self, node):
+        self.things.remove_node(node)
+
+    def nodes(self):
+        return list(self.things)
+    
     # insert a new thing into the void from parent
     def add(self, thing, parent = None):
         if not self.name:
             self.name = thing
-        if thing not in self.things:
+        if not self.contains(thing):
             self.things.add_node(thing)
-        if parent in self.things:
+        if parent and parent not in self.neighbors(thing):
             self.things.add_edge(parent, thing)
+
+    def add_edge(self, n1, n2):
+        self.things.add_edge(n1, n2)
+
+    # INTERACTIONS
+    def get_thing(self, prompt = ''):
+        thing = input(prompt)
+        while not thing or thing[0] == '/':
+            print('invalid\n')
+            thing = input(prompt)
+        return thing
+            
+    # offer choices in a numbered list
+    def offer_choice(self, options):
+        if not options:
+            print('nothing found')
+            return
+        yes_no = len(options) == 1
+        print('choose (y/n, default y)' if yes_no else 'choose #: ')
+        for i, r in enumerate(options):
+            print (str(i) + ') ' + r)
+        choice = input()
+        if yes_no:
+            if choice == 'y' or choice == '':
+                return options[0]
+            elif choice == 'n':
+                return
+            else:
+                print('invalid choice, picking no')
+                return
+        # valid numerical choice
+        elif choice.isdigit() and int(choice) < len(options):
+            return options[int(choice)]
+        # choosing via typing the exact contents
+        elif choice in options:
+            return choice
+        # try narrow options by search
+        else:
+            searched_options = [o for o in options if choice in o]
+            if choice and searched_options:
+                print('*narrowed options by search*')
+                return self.offer_choice(searched_options)
+            else:
+                print('invalid choice')
+                return
 
     # search for a node
     def search(self, thing, parent):
-        results = [n for n in self.things if thing in n]
-        print("choose # to go to node, + to add connection:") 
-        for i, r in enumerate(results):
-            print (str(i) + ') ' + r)
-        if len(results) == 0:
-            print('nothing found')
-            return
-        choice = input()
-        try:
-            is_connection = choice[-1] == '+'
-            number = int(choice[:-1] if is_connection else choice)
-            if number < len(results):
-                result = results[number]
-                if is_connection:
-                    self.add(result, parent)
-                return result
-            print("invalid choice")
-        except Exception as e:
-            print(e)
-
+        results = [n for n in self.nodes() if thing in n]
+        results.sort(key = lambda r: -len(self.neighbors(r)))
+        choice = self.offer_choice(results)
+        # TODO: add connection
+        return choice
+        
     # return string of neighbors of node
-    def neighbors(self, thing):
-        if thing not in self.things:
+    def choose_neighbor(self, thing):
+        if not self.contains(thing):
             return ''
-        return '\n'.join([str(t) for t in self.things[thing]])
+        neighbors = self.neighbors(thing)
+        neighbors.sort(key = lambda n: -len(self.neighbors(n)))
+        return self.offer_choice(neighbors)
 
     # replace current node and its neighbors with new node
-    def condense(self, thing, new):
+    def condense(self, thing):
+        for n in self.neighbors(thing):
+            print(n)
+        new = self.get_thing('condense ^ into (RET to cancel): \n')
+        if not new:
+            return
         # collect all nodes 2 away                     
-        neighbors = [n for n in self.things[thing]]
+        neighbors = self.neighbors(thing)
         two_away = []
         for n in neighbors:
-            for n2 in self.things[n]:
+            for n2 in self.neighbors(n):
                 if n2 != thing and n2 not in neighbors:
                     two_away.append(n2)
         # remove node and all neighbors
-        self.things.remove_node(thing)
+        self.delete_node(thing)
         for n in neighbors:
-            self.things.remove_node(n)
+            self.delete_node(n)
         # add replacement with kept edges
-        self.things.add_node(new)
-        self.things.add_edges_from([(new, n) for n in two_away])
+        self.add(new)
+        for n in two_away:
+            self.add_edge(new, n)
+        return new
 
     # return random neighbor (or just random node)
     def spit(self, thing = None):
-        if not self.things:
+        if self.empty():
             return ''
-        if thing in self.things and self.things[thing]:
-            return random.choice(list(self.things[thing]))
-        return random.choice(list(self.things.nodes)) # chance to random?
+        if self.contains(thing) and self.neighbors(thing):
+            return random.choice(self.neighbors(thing))
+        return random.choice(self.nodes()) # chance to random?
 
     # asks user to choose between until all but one are eliminated
-    def user_pick_node(self):
-        remaining = set(self.things.nodes)
+    def pick_tournament(self):
+        print('let\'s pick something!')
+        remaining = set(self.nodes())
         while len(remaining) > 1:
             a, b = remaining.pop(), remaining.pop()
-            print('right now, would you rather explore (1) or (2):')
-            print('(1) ' + str(a))
-            print('(2) ' + str(b))
-            choice = input()
-            while choice not in ['1', '2', '/q']:
-                choice = input('enter 1 or 2: ')
-            if choice == '/q':
-                return 'Aborted'
-            if choice == '1':
-                remaining.add(a)
-            else:
-                remaining.add(b)
-        return remaining.pop()
+            choice = None
+            while not choice:
+                print('/q to quit')
+                choice = self.offer_choice([a, b])
+                if choice == '/q':
+                    print('Aborted')
+                    return
+            remaining.add(choice)
+        chosen = remaining.pop()
+        print('Your mission is to explore: ' + str(chosen))
+        return chosen
 
     # DISPLAY
     # draw graph in new window
     def draw(self):        
         nx.draw(self.things, with_labels=True, font_weight='bold')
         plt.show()
-        
-    # return string of items sorted by degree
-    def recap(self):
-        recap = []
-        for n in self.things.nodes:
-            recap.append((n, list(self.things[n])))
-        recap.sort(key = lambda x: -len(x[1]))
-        return '\n'.join(map(lambda x: str(x), recap))
 
     # SESSION SAVING
-    def list_sessions(self):
-        for f in os.listdir(self.SAVE_DIR):
-            if os.path.isfile(os.path.join(self.SAVE_DIR + f)):
-                print(f)
-                
+    def saved_sessions(self, directory):
+        sessions = []
+        files = []
+        files = os.listdir(directory)
+        get_path = lambda f: os.path.join(directory + f)
+        files.sort(key = lambda f: os.path.getmtime(get_path(f)))
+        for f in files:
+            if os.path.isfile(get_path(f)):
+                sessions.append(f)
+        return sessions
+
     # write to file in main session folder
-    def save(self, name = None):
+    def save(self):
+        name = self.get_thing('save name (default ' + self.name + '):')
         if name:
             self.name = name
         if not self.name:
@@ -127,6 +177,10 @@ class Void:
             return
         nx.write_gml(self.things, self.SAVE_DIR + self.name)
 
+    def offer_archive(self):
+        if self.nodes() and self.offer_choice(['archive first?']):
+            self.archive()
+        
     # write to file with timestamp into archives folder
     def archive(self):
         timestamp = datetime.datetime.now()
@@ -134,86 +188,99 @@ class Void:
         archive_name = self.name + '_' + time_str
         nx.write_gml(self.things, self.ARCHIVE_DIR + archive_name)
 
-    def load(self, name):
-        if not self.things:
-            try:                
-                self.things = nx.read_gml(self.SAVE_DIR + name)
-                self.name = name
-            except Exception as e:
-                print(e)
-                print('not found')
+    def delete(self):
+        if self.name not in self.saved_sessions(self.SAVE_DIR):
+            print('session not saved')
+            return
+        if self.offer_choice(['delete this save?']):            
+            self.offer_archive()
+            os.remove(self.SAVE_DIR + self.name)
 
+    def load(self, archive = False):
+        directory = self.ARCHIVE_DIR if archive else self.SAVE_DIR
+        name = self.offer_choice(self.saved_sessions(directory))
+        if name:
+            self.things = nx.read_gml(directory + name)
+            self.name = name
+        
     def __str__(self):
         return self.recap()
 
     def loop(self):
-        old = 'Welcome to the Void'
+        print('Welcome to the Void')
+        old = ''
         while True:
             # spit message and take input
-            new = input("(? for options): " + old + "\n")
+            new = input('(? for options): ' + old + '\n')
             # options info
             if new == '?':
-                # TODO: more navigation options? delete?
                 print('''COMMANDS:
-                _ - create new node
-                /_  - search for node
+                ?  - help 
+                _  - create new node
+                /_ - search for node
+                // - search + connect to node
                 /c - condense node w/ neighbors
-                /n - show neighbors
-                /p - print list
+                /n - show + pick a neighbor
+                /p - pick a node (tournament-style)
                 /g - draw graph
-                /a - action picker
                 /s - save session
                 /l - load session
+                /a - archive session
                 /q - quit
                 ''')
-                # special commands start with /
+            # special commands start with /
             elif new and new[0] == '/':
-                if new == '/p':
-                    print("\n-----------------------RECAP-------------------------")        
-                    print(self.recap() + '\n')
-                elif new == '/g':
-                    self.draw()
-                elif new == '/n':
-                    print(self.neighbors(old))
-                elif new == '/c':
-                    print(self.neighbors(old))
-                    thing = input('condense ^ into (/q to cancel): \n')
-                    if thing != '/q':
-                        self.condense(old, thing)
-                        old = thing
-                elif new == '/s':
-                    name = input('save name (default ' + self.name + '):')
-                    self.save(name)
-                elif new == '/l':
-                    self.list_sessions()
-                    name = input('load name: ')
-                    self.load(name)
-                elif new == '/a':
-                    print('let\'s do something!')
-                    chosen = self.user_pick_node()
-                    print('Your mission is to explore: ' + str(chosen))
-                    old = chosen
-                elif new == '/q':
-                    # auto-save for data collection
-                    # self.archive()
-                    return
-                else:
-                    result = self.search(new[1:], old)
+                if new == '/n' and old:
+                    result = self.choose_neighbor(old)
                     if result:
                         old = result
+                elif new == '/g':
+                    self.draw()
+                elif new == '/c' and old:
+                    result = self.condense(old)
+                    if result:
+                        old = result
+                elif new == '/p':
+                    chosen = self.pick_tournament()
+                    if chosen:
+                        old = chosen                        
+                elif new == '/l':
+                    self.load()
+                    old = self.name if self.contains(self.name) else ''
+                elif new == '/la':
+                    self.load(True)
+                    old = self.name if self.contains(self.name) else ''
+                elif new == '/s':
+                    self.save()
+                elif new == '/d':
+                    self.delete()
+                elif new == '/a':
+                    self.archive()
+                elif new == '/q':
+                    self.offer_archive()
+                    return
+                else:
+                    # double slash = search with connection
+                    if len(new) > 1 and new[1] == '/':
+                        result = self.search(new[2:], old)
+                        self.add(result, old)
+                    else:
+                        # single slash = normal search
+                        result = self.search(new[1:], old)
+                        if result:
+                            old = result
             # normal input
             elif new == '':
                 old = self.spit(old)
             else:
                 void.add(new, old)
-                old = self.spit(old)
+                if not old:
+                    old = new
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     try:
         # initiate session
         void = Void()
         void.loop()
     except Exception as e:
         print(e)
-        # auto-save for data collection
-        void.archive()
