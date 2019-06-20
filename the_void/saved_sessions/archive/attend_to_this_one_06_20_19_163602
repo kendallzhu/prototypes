@@ -1,0 +1,166 @@
+graph [
+  node [
+    id 0
+    label "when everything is hurting, this one needs to be attended to, not somewhere else"
+  ]
+  node [
+    id 1
+    label "looking for solutions outside"
+  ]
+  node [
+    id 2
+    label "blaming others"
+  ]
+  node [
+    id 3
+    label "wanting certain projects to give me fulfillment"
+  ]
+  node [
+    id 4
+    label "need inner balance if I want to be able to do anything significant"
+  ]
+  node [
+    id 5
+    label "the limiting factor is inside myself"
+  ]
+  node [
+    id 6
+    label "literally this small change in perspective makes me feel so differently"
+  ]
+  node [
+    id 7
+    label "these project are not even started by me, nor will be finished by me"
+  ]
+  node [
+    id 8
+    label "I can only participate in them for a short time beautifully"
+  ]
+  node [
+    id 9
+    label "grabbing food at work compulsively, lack of perspective"
+  ]
+  node [
+    id 10
+    label "basic things like learning to walk and breathe"
+  ]
+  node [
+    id 11
+    label "when I'm hurting I don't even dare to learn"
+  ]
+  node [
+    id 12
+    label "I could so easily get input from friends and improve my activities, but I'm too this or that"
+  ]
+  node [
+    id 13
+    label "just for right now, I can at least come to terms with death"
+  ]
+  node [
+    id 14
+    label "I was given great gifts by my ancestors, they had insights"
+  ]
+  node [
+    id 15
+    label "I will leave without anything having been fulfilled, very soon"
+  ]
+  node [
+    id 16
+    label "but while I'm here, I will make life worthwhile"
+  ]
+  node [
+    id 17
+    label "I don't need my todos hanging over me"
+  ]
+  node [
+    id 18
+    label "I cannot guarantee anything, but I can just keep the door open "
+  ]
+  node [
+    id 19
+    label "I also don't need credit for my ancestors' accomplishments, only appreciation and participation"
+  ]
+  node [
+    id 20
+    label "no expectations of feeling good either"
+  ]
+  edge [
+    source 0
+    target 1
+  ]
+  edge [
+    source 0
+    target 4
+  ]
+  edge [
+    source 0
+    target 5
+  ]
+  edge [
+    source 0
+    target 6
+  ]
+  edge [
+    source 0
+    target 10
+  ]
+  edge [
+    source 0
+    target 11
+  ]
+  edge [
+    source 1
+    target 2
+  ]
+  edge [
+    source 1
+    target 3
+  ]
+  edge [
+    source 1
+    target 9
+  ]
+  edge [
+    source 3
+    target 7
+  ]
+  edge [
+    source 3
+    target 8
+  ]
+  edge [
+    source 5
+    target 12
+  ]
+  edge [
+    source 10
+    target 13
+  ]
+  edge [
+    source 13
+    target 14
+  ]
+  edge [
+    source 13
+    target 15
+  ]
+  edge [
+    source 13
+    target 16
+  ]
+  edge [
+    source 13
+    target 17
+  ]
+  edge [
+    source 17
+    target 18
+  ]
+  edge [
+    source 17
+    target 19
+  ]
+  edge [
+    source 17
+    target 20
+  ]
+]

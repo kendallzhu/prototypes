@@ -1,0 +1,254 @@
+graph [
+  node [
+    id 0
+    label "jp+rogan"
+  ]
+  node [
+    id 1
+    label "drug policy - I better not be able to tell or ur pathetic"
+  ]
+  node [
+    id 2
+    label "pathology on both ends: complete abstention usually not so good"
+  ]
+  node [
+    id 3
+    label "opiod manufacturer disgusting"
+  ]
+  node [
+    id 4
+    label "opiods make jp's daughter feel dead"
+  ]
+  node [
+    id 5
+    label "teenagers want to fit in so peer pressure"
+  ]
+  node [
+    id 6
+    label "florida is the land of teh lost"
+  ]
+  node [
+    id 7
+    label "people go to escape"
+  ]
+  node [
+    id 8
+    label "america is super fake"
+  ]
+  node [
+    id 9
+    label "jp is one of the most misrepresented person ever"
+  ]
+  node [
+    id 10
+    label "strange distorted descriptions"
+  ]
+  node [
+    id 11
+    label "rogan is loved by bald men with tatoos"
+  ]
+  node [
+    id 12
+    label "jp feels much positivity at lectures and stuff but not online"
+  ]
+  node [
+    id 13
+    label "self-improvement book connectd to massacres"
+  ]
+  node [
+    id 14
+    label "podcasts and youtube better known in places without good news"
+  ]
+  node [
+    id 15
+    label "public encounters with serious stories being encouraged"
+  ]
+  node [
+    id 16
+    label "few people have such an impact and vision"
+  ]
+  node [
+    id 17
+    label "paying attention to it makes it too mind boggling (I say it's not me, I'm just dying today)"
+  ]
+  node [
+    id 18
+    label "doing these intense deep podcasts that are very long"
+  ]
+  node [
+    id 19
+    label "not doing it for money"
+  ]
+  node [
+    id 20
+    label "education and learning about people"
+  ]
+  node [
+    id 21
+    label "tkd and kickboxing very into it"
+  ]
+  node [
+    id 22
+    label "brain damage -> comedy"
+  ]
+  node [
+    id 23
+    label "jesus rogan is 51"
+  ]
+  node [
+    id 24
+    label "lots of injuries in the past"
+  ]
+  node [
+    id 25
+    label "brain damage disturbing"
+  ]
+  node [
+    id 26
+    label "open mic nights"
+  ]
+  node [
+    id 27
+    label "great art form must help younguns"
+  ]
+  node [
+    id 28
+    label "what is this obsessiveness"
+  ]
+  node [
+    id 29
+    label "hurting something is yikes, what if me? never the same"
+  ]
+  node [
+    id 30
+    label "q"
+  ]
+  node [
+    id 31
+    label "cry when happy"
+  ]
+  edge [
+    source 0
+    target 1
+  ]
+  edge [
+    source 0
+    target 3
+  ]
+  edge [
+    source 0
+    target 6
+  ]
+  edge [
+    source 0
+    target 8
+  ]
+  edge [
+    source 0
+    target 9
+  ]
+  edge [
+    source 0
+    target 11
+  ]
+  edge [
+    source 0
+    target 12
+  ]
+  edge [
+    source 0
+    target 21
+  ]
+  edge [
+    source 0
+    target 23
+  ]
+  edge [
+    source 0
+    target 30
+  ]
+  edge [
+    source 0
+    target 31
+  ]
+  edge [
+    source 1
+    target 2
+  ]
+  edge [
+    source 1
+    target 4
+  ]
+  edge [
+    source 1
+    target 5
+  ]
+  edge [
+    source 6
+    target 7
+  ]
+  edge [
+    source 9
+    target 10
+  ]
+  edge [
+    source 9
+    target 13
+  ]
+  edge [
+    source 9
+    target 14
+  ]
+  edge [
+    source 12
+    target 15
+  ]
+  edge [
+    source 15
+    target 16
+  ]
+  edge [
+    source 16
+    target 17
+  ]
+  edge [
+    source 16
+    target 19
+  ]
+  edge [
+    source 17
+    target 18
+  ]
+  edge [
+    source 19
+    target 20
+  ]
+  edge [
+    source 21
+    target 22
+  ]
+  edge [
+    source 21
+    target 29
+  ]
+  edge [
+    source 22
+    target 26
+  ]
+  edge [
+    source 23
+    target 24
+  ]
+  edge [
+    source 24
+    target 25
+  ]
+  edge [
+    source 26
+    target 27
+  ]
+  edge [
+    source 27
+    target 28
+  ]
+]
