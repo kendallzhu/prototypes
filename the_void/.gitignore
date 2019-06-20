@@ -1,0 +1,5 @@
+# ignore all files with no extension (saved sessions)
+
+*
+!/**/
+!*.*
