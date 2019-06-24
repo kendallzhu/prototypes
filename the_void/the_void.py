@@ -1,8 +1,10 @@
-import os
+import sys, os
+import traceback
 import random
 import datetime
 import networkx as nx
 import matplotlib.pyplot as plt
+from collections import Counter
 
 # undirected graph of thoughts/ideas/questions
 class Void:
@@ -12,9 +14,11 @@ class Void:
         self.modified = False
         self.name = ''
         self.things = nx.Graph()
+        # for traversal heuristic
+        self.aversion = Counter()
 
     # BASIC UTILITIES
-    def empty(self):
+    def is_empty(self):
         return not self.things
     
     def contains(self, thing):
@@ -23,11 +27,14 @@ class Void:
     def neighbors(self, node):
         return list(self.things[node])
 
+    def degree(self, node):
+        return len(self.neighbors(node))
+
     def delete_node(self, node):
         self.things.remove_node(node)
 
     def nodes(self):
-        return list(self.things)
+        return sorted(list(self.things), key = lambda n: -self.degree(n))
     
     # insert a new thing into the void from parent
     def add(self, thing, parent = None):
@@ -51,23 +58,20 @@ class Void:
             thing = input(full_prompt)
             if (not thing) and default:
                 thing = default
-            if not thing or thing[0] == '/':
-                print('invalid, try again\n')
+            if not thing or '/' in thing or '.' in thing or '\\' in thing:
+                print('invalid, try again (no dots or slashes) \n')
             else:
                 break
         return thing
             
-    # offer choices in a numbered list - not guaranteed answer
+    # offer choices in a numbered list - returns None if no answer
     def offer_choice(self, options):
         if not options:
             print('nothing found')
             return
-        yes_no = len(options) == 1
-        print('choose (y/n, default y)' if yes_no else 'choose #: ')
-        for i, r in enumerate(options):
-            print (str(i) + ') ' + r)
-        choice = input()
-        if yes_no:
+        # special case for single option
+        if len(options) == 1:
+            choice = input(options[0] + ' (y/n, default y)\n')
             if choice == 'y' or choice == '':
                 return options[0]
             elif choice == 'n':
@@ -75,15 +79,18 @@ class Void:
             else:
                 print('invalid choice, picking no')
                 return
+        for i, r in enumerate(options):
+            print (str(i) + ') ' + r)
+        choice = input('choose #:\n')
         # valid numerical choice
-        elif choice.isdigit() and int(choice) < len(options):
+        if choice.isdigit() and int(choice) < len(options):
             return options[int(choice)]
         # choosing via typing the exact contents
         elif choice in options:
             return choice
         # try narrow options by search
         else:
-            searched_options = [o for o in options if choice in o]
+            searched_options = [o for o in options if choice.lower() in o.lower()]
             if choice and searched_options:
                 print('*narrowed options by search*')
                 return self.offer_choice(searched_options)
@@ -91,10 +98,10 @@ class Void:
                 print('invalid choice')
                 return
 
+    # NAVIGATION
     # search for a node
     def search(self, thing, parent):
         results = [n for n in self.nodes() if thing in n]
-        results.sort(key = lambda r: -len(self.neighbors(r)))
         choice = self.offer_choice(results)
         # TODO: add connection
         return choice
@@ -104,68 +111,31 @@ class Void:
         if not self.contains(thing):
             return ''
         neighbors = self.neighbors(thing)
-        neighbors.sort(key = lambda n: -len(self.neighbors(n)))
         return self.offer_choice(neighbors)
-
-    # replace current node and its neighbors with new node
-    def condense(self, thing):
-        neighbors = self.neighbors(thing)
-        for n in neighbors:
-            print(n)
-        default = neighbors[0] if len(neighbors) == 1 else 'cancel'
-        new = self.ask_name_safe('condense all above ^ into single node', default)
-        if new == 'cancel':
-            return
-        # collect all nodes 2 away                     
-        neighbors = self.neighbors(thing)
-        two_away = []
-        for n in neighbors:
-            for n2 in self.neighbors(n):
-                if n2 != thing and n2 not in neighbors:
-                    two_away.append(n2)
-        # remove node and all neighbors
-        self.delete_node(thing)
-        for n in neighbors:
-            self.delete_node(n)
-        # add replacement with kept edges
-        self.add(new)
-        for n in two_away:
-            self.add_edge(new, n)
-        return new
 
     # return random neighbor (or just random node)
     def spit(self, thing = None):
-        if self.empty():
+        if self.is_empty():
             return ''
+        options = []
         if self.contains(thing) and self.neighbors(thing):
-            return random.choice(self.neighbors(thing))
-        return random.choice(self.nodes()) # chance to random?
-
-    # asks user to choose between until all but one are eliminated
-    def pick_tournament(self):
-        print('let\'s pick something!')
-        remaining = set(self.nodes())
-        while len(remaining) > 1:
-            a, b = remaining.pop(), remaining.pop()
-            choice = None
-            while not choice:
-                print('/q to quit')
-                choice = self.offer_choice([a, b])
-                if choice == '/q':
-                    print('Aborted')
-                    return
-            remaining.add(choice)
-        chosen = remaining.pop()
-        print('Your mission is to explore: ' + str(chosen))
-        return chosen
+            options = self.neighbors(thing)
+        else:
+            options = self.nodes()
+        # choose by aversion heuristic, then by less neighbors first
+        options.sort(key = lambda n: (self.aversion[n], self.degree(n)))
+        choice = options[0]
+        # aversion increases as a node is repeatedly visited
+        self.aversion[choice] += 1 / self.degree(choice)
+        return choice
 
     # DISPLAY
     # draw graph in new window
     def draw(self):        
-        nx.draw(self.things, with_labels=True, font_weight='bold')
+        nx.draw_kamada_kawai(self.things, with_labels=True, font_weight='bold')
         plt.show()
 
-    # SESSION SAVING
+    # SESSION SAVING - saved files have no extension
     def saved_sessions(self, directory):
         sessions = []
         files = []
@@ -173,7 +143,7 @@ class Void:
         get_path = lambda f: os.path.join(directory + f)
         files.sort(key = lambda f: os.path.getmtime(get_path(f)))
         for f in files:
-            if os.path.isfile(get_path(f)):
+            if os.path.isfile(get_path(f)) and '.' not in f:
                 sessions.append(f)
         return sessions
 
@@ -195,13 +165,16 @@ class Void:
         nx.write_gml(self.things, self.ARCHIVE_DIR + archive_name)
         print('archived!')
 
+    def offer_archive(self):
+        if self.nodes() and self.offer_choice(['archive?']):
+            self.archive()
+
     def delete_save(self):
         if self.name not in self.saved_sessions(self.SAVE_DIR):
             print('session not saved')
             return
         if self.offer_choice(['delete this save?']):
-            if self.nodes() and self.offer_choice(['archive first?']):
-                self.archive()
+            self.offer_archive()
             os.remove(self.SAVE_DIR + self.name)
             print('deleted!')
 
@@ -220,6 +193,61 @@ class Void:
             self.things = nx.read_gml(directory + name)
             self.name = name
             print('loaded!')
+
+    # ADVANCED FEATURES
+    # replace current node and its neighbors with new node
+    def condense(self, thing):
+        print('\n')
+        neighbors = self.neighbors(thing)
+        print(thing)
+        for n in neighbors:
+            print(n)
+        default = neighbors[0] if len(neighbors) == 1 else 'dont condense'
+        new = self.ask_name_safe('[condense all above ^ into single node]', default)
+        if new == 'dont condense':
+            return
+        # collect all nodes 2 away                     
+        neighbors = self.neighbors(thing)
+        two_away = []
+        for n in neighbors:
+            for n2 in self.neighbors(n):
+                if n2 != thing and n2 not in neighbors:
+                    two_away.append(n2)
+        # remove node and all neighbors
+        self.delete_node(thing)
+        for n in neighbors:
+            self.delete_node(n)
+        # add replacement with kept edges
+        self.add(new)
+        for n in two_away:
+            self.add_edge(new, n)
+        return new
+
+    # offer comprehensive review of graph
+    def iterate(self):
+        self.offer_archive()
+        print('Review Step 1: try condensing nodes\n')
+        for n in self.nodes():
+            if n in self.nodes():
+                result = self.condense(n)
+        print('Done Review!')
+
+    # asks user to choose between until all but one are eliminated
+    def pick_tournament(self):
+        print('let\'s pick something!')
+        remaining = set(self.nodes())
+        while len(remaining) > 1:
+            a, b = remaining.pop(), remaining.pop()
+            choice = None
+            while not choice:
+                choice = self.offer_choice([a, b])
+                if not choice and self.offer_choice(['quit picking?']):                   
+                    print('Aborted')
+                    return
+            remaining.add(choice)
+        chosen = remaining.pop()
+        print('Your mission is to explore: ' + str(chosen))
+        return chosen
         
     def __str__(self):
         return self.recap()
@@ -232,23 +260,27 @@ class Void:
             new = input('(? for options): ' + old + '\n')
             # options info
             if new == '?':
-                print('''COMMANDS:
-                ?   - help 
-                _   - create new node from here
-                /_  - search for node
-                //_ - search + connect to node
-                /n  - list + goto neighbor
-                RET - goto random neighbor
-                /g  - draw graph
-                /c  - condense node w/ neighbors
-                /p  - pick a node (tournament-style)
-                /s  - save session
-                /l  - load saved session
-                /d  - delete session
-                /a  - archive session
-                /la - load archive
-                /da - delete archive
-                /q  - quit
+                print('''
+COMMANDS:
+    ?   - help 
+    _   - create new node from here
+    /_  - search for node
+    //_ - search + connect to node
+    /n  - pick neighbor
+    RET - auto traverse (less visited neighbor)
+    /g  - draw graph
+    /c  - condense node w/ neighbors
+    /s  - save session
+    /l  - load saved session
+    /d  - delete session
+    /a  - archive session
+    /la - load archive
+    /da - delete archive
+    /q  - quit
+
+ADVANCED:
+    /pick    - pick a node (tournament-style)
+    /iterate - review + compress entire graph
                 ''')
             # special commands start with /
             elif new and new[0] == '/':
@@ -262,10 +294,6 @@ class Void:
                     result = self.condense(old)
                     if result:
                         old = result
-                elif new == '/p':
-                    chosen = self.pick_tournament()
-                    if chosen:
-                        old = chosen                        
                 elif new == '/l':
                     self.load()
                     old = self.name if self.contains(self.name) else ''
@@ -282,11 +310,19 @@ class Void:
                     self.archive()
                 elif new == '/q':
                     return
+                elif new == '/pick':
+                    chosen = self.pick_tournament()
+                    if chosen:
+                        old = chosen
+                elif new == '/iterate':
+                    self.iterate()
                 else:
                     # double slash = search with connection
                     if len(new) > 1 and new[1] == '/':
                         result = self.search(new[2:], old)
-                        self.add(result, old)
+                        if result:
+                            self.add(result, old)
+                            old = result
                     else:
                         # single slash = normal search
                         result = self.search(new[1:], old)
@@ -297,13 +333,13 @@ class Void:
                 old = self.spit(old)
             else:
                 void.add(new, old)
-                if not old:
-                    old = new
+                # automatically go to new thing when creating
+                old = new
 
 if __name__ == '__main__':
     try:
         # initiate session
         void = Void()
         void.loop()
-    except Exception as e:
-        print(e)
+    except Exception as _:
+        print(traceback.format_exc())
