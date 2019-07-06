@@ -13,6 +13,7 @@ class Void:
     def __init__(self):
         self.modified = False
         self.name = ''
+        # nodes are strings
         self.things = nx.Graph()
         # for traversal heuristic
         self.aversion = Counter()
@@ -31,6 +32,7 @@ class Void:
         return len(self.neighbors(node))
 
     def delete_node(self, node):
+        self.modified = True
         self.things.remove_node(node)
 
     def nodes(self):
@@ -38,6 +40,7 @@ class Void:
     
     # insert a new thing into the void from parent
     def add(self, thing, parent = None):
+        self.modified = True
         if not self.name:
             self.name = thing
         if not self.contains(thing):
@@ -46,6 +49,7 @@ class Void:
             self.things.add_edge(parent, thing)
 
     def add_edge(self, n1, n2):
+        self.modified = True
         self.things.add_edge(n1, n2)
 
     # INTERACTIONS
@@ -63,18 +67,22 @@ class Void:
             else:
                 break
         return thing
-            
+
     # offer choices in a numbered list - returns None if no answer
-    def offer_choice(self, options):
+    def offer_choice(self, options, defaultYes = True):
         if not options:
             print('nothing found')
             return
         # special case for single option
         if len(options) == 1:
-            choice = input(options[0] + ' (y/n, default y)\n')
-            if choice == 'y' or choice == '':
+            if defaultYes:
+                choice = input('0) ' + options[0] + ' (y/n, default y)\n')
+            else:
+                choice = input('0) ' + options[0] + ' (y/n, default n)\n')
+            if choice == 'y' or choice == '0' or choice == options[0] or \
+               (choice == '' and defaultYes):
                 return options[0]
-            elif choice == 'n':
+            elif choice == 'n' or not defaultYes:
                 return
             else:
                 print('invalid choice, picking no')
@@ -101,7 +109,7 @@ class Void:
     # NAVIGATION
     # search for a node
     def search(self, thing, parent):
-        results = [n for n in self.nodes() if thing in n]
+        results = [n for n in self.nodes() if thing.lower() in n.lower()]
         choice = self.offer_choice(results)
         # TODO: add connection
         return choice
@@ -111,7 +119,7 @@ class Void:
         if not self.contains(thing):
             return ''
         neighbors = self.neighbors(thing)
-        return self.offer_choice(neighbors)
+        return self.offer_choice(neighbors, False)
 
     # return random neighbor (or just random node)
     def spit(self, thing = None):
@@ -126,14 +134,18 @@ class Void:
         options.sort(key = lambda n: (self.aversion[n], self.degree(n)))
         choice = options[0]
         # aversion increases as a node is repeatedly visited
-        self.aversion[choice] += 1 / self.degree(choice)
+        if self.degree(choice) > 0:
+            self.aversion[choice] += 1 / self.degree(choice)
         return choice
 
     # DISPLAY
     # draw graph in new window
-    def draw(self):        
-        nx.draw_kamada_kawai(self.things, with_labels=True, font_weight='bold')
-        plt.show()
+    def draw(self):
+        if self.things:
+            nx.draw_kamada_kawai(self.things, with_labels=True, font_weight='bold')
+            plt.show()
+        else:
+            print('nothing to draw yet')
 
     # SESSION SAVING - saved files have no extension
     def saved_sessions(self, directory):
@@ -148,12 +160,14 @@ class Void:
         return sessions
 
     def rename(self):
+        self.modified = True
         self.name = self.ask_name_safe('save name', self.name)
     
     # write to file in main session folder
     def save(self):
         self.rename()
         nx.write_gml(self.things, self.SAVE_DIR + self.name)
+        self.modified = False
         print('saved!')
         
     # write to file with timestamp into archives folder
@@ -169,6 +183,10 @@ class Void:
         if self.nodes() and self.offer_choice(['archive?']):
             self.archive()
 
+    def offer_save(self):
+        if self.nodes() and self.modified and self.offer_choice(['save?']):
+            self.save()
+            
     def delete_save(self):
         if self.name not in self.saved_sessions(self.SAVE_DIR):
             print('session not saved')
@@ -192,7 +210,12 @@ class Void:
         if name:
             self.things = nx.read_gml(directory + name)
             self.name = name
+            self.modified = False
             print('loaded!')
+
+    def new_session(self):
+        self.offer_save()
+        self.__init__()
 
     # ADVANCED FEATURES
     # replace current node and its neighbors with new node
@@ -203,7 +226,7 @@ class Void:
         for n in neighbors:
             print(n)
         default = neighbors[0] if len(neighbors) == 1 else 'dont condense'
-        new = self.ask_name_safe('[condense all above ^ into single node]', default)
+        new = self.ask_name_safe('[condense all ^ into single node]', default)
         if new == 'dont condense':
             return
         # collect all nodes 2 away                     
@@ -224,13 +247,13 @@ class Void:
         return new
 
     # offer comprehensive review of graph
-    def iterate(self):
+    def compress(self):
         self.offer_archive()
-        print('Review Step 1: try condensing nodes\n')
+        print('Try condensing edge nodes\n')
         for n in self.nodes():
-            if n in self.nodes():
+            if n in self.nodes() and self.degree(n) < 2:
                 result = self.condense(n)
-        print('Done Review!')
+        print('Done Compressing!')
 
     # asks user to choose between until all but one are eliminated
     def pick_tournament(self):
@@ -268,19 +291,20 @@ COMMANDS:
     //_ - search + connect to node
     /n  - pick neighbor
     RET - auto traverse (less visited neighbor)
-    /g  - draw graph
+    /g  - draw graph    
     /c  - condense node w/ neighbors
     /s  - save session
     /l  - load saved session
-    /d  - delete session
     /a  - archive session
+    /d  - delete session
     /la - load archive
     /da - delete archive
+    /ln - new session
     /q  - quit
 
 ADVANCED:
     /pick    - pick a node (tournament-style)
-    /iterate - review + compress entire graph
+    /compress - condense all leaf nodes in graph
                 ''')
             # special commands start with /
             elif new and new[0] == '/':
@@ -308,14 +332,17 @@ ADVANCED:
                     self.delete_archive()
                 elif new == '/a':
                     self.archive()
+                elif new == '/ln':
+                    self.new_session()
+                    old = 'Welcome To the Void'
                 elif new == '/q':
                     return
                 elif new == '/pick':
                     chosen = self.pick_tournament()
                     if chosen:
                         old = chosen
-                elif new == '/iterate':
-                    self.iterate()
+                elif new == '/compress':
+                    self.compress()
                 else:
                     # double slash = search with connection
                     if len(new) > 1 and new[1] == '/':
