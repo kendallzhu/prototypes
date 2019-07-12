@@ -16,7 +16,7 @@ class Void:
         # nodes are strings
         self.things = nx.Graph()
         # for traversal heuristic
-        self.aversion = Counter()
+        self.weighted_visits = Counter()
 
     # BASIC UTILITIES
     def is_empty(self):
@@ -57,7 +57,7 @@ class Void:
     def ask_name_safe(self, prompt = '', default = ''):
         full_prompt = prompt + ':'
         if default:
-            full_prompt += ' (default - ' + default + ')\n'
+            full_prompt += ' (default - {})\n'.format(default)
         while True:
             thing = input(full_prompt)
             if (not thing) and default:
@@ -69,39 +69,65 @@ class Void:
         return thing
 
     # offer choices in a numbered list - returns None if no answer
-    def offer_choice(self, options, defaultYes = True):
+    def offer_choice(self, options, **kwargs):
+        default = kwargs.get('default', None)
+        allow_rng = kwargs.get('allow_rng', False)
         if not options:
-            print('nothing found')
+            print('no options to choose from')
             return
-        # special case for single option
+        if not (type(default) == int and default < len(options)):
+            default = None
+        # special y/n query for single option, always default
         if len(options) == 1:
-            if defaultYes:
-                choice = input('0) ' + options[0] + ' (y/n, default y)\n')
-            else:
-                choice = input('0) ' + options[0] + ' (y/n, default n)\n')
+            default_string = 'y' if default == 0 else 'n'
+            prompt = '0) {} (y/n, default {})\n'.format(options[0], default_string)
+            choice = input(prompt)
             if choice == 'y' or choice == '0' or choice == options[0] or \
-               (choice == '' and defaultYes):
+               (choice == '' and default == 0):
                 return options[0]
-            elif choice == 'n' or not defaultYes:
+            elif choice == 'n' or default != 0:
                 return
             else:
                 print('invalid choice, picking no')
                 return
+        print('\n')
         for i, r in enumerate(options):
             print (str(i) + ') ' + r)
-        choice = input('choose #:\n')
-        # valid numerical choice
+        # multiple options - numerical list
+        if allow_rng:
+            print('(decimal (0, 1) => rng option 0)')
+        if default:
+            prompt = 'choose # or search (default - {}):'.format(default)
+        else:
+            prompt = 'choose # or search:'
+        choice = input(prompt + '\n')
         if choice.isdigit() and int(choice) < len(options):
             return options[int(choice)]
         # choosing via typing the exact contents
         elif choice in options:
             return choice
+        elif not choice and default:
+            return options[default]
+        # see if user input probability for first option
+        elif allow_rng:
+            try:
+                probability = float(choice)
+            except:
+                probability = 0
+            # only interpret decimals between 0 and 1 exclusive as probabilities
+            if probability > 0 and probability < 1:
+                if random.random() < probability:
+                    return options[0]
+                else:
+                    if len(options) == 2:
+                        return options[1]
+                    return self.offer_choice(options[1:])
         # try narrow options by search
         else:
             searched_options = [o for o in options if choice.lower() in o.lower()]
             if choice and searched_options:
                 print('*narrowed options by search*')
-                return self.offer_choice(searched_options)
+                return self.offer_choice(searched_options, default = 0)
             else:
                 print('invalid choice')
                 return
@@ -110,32 +136,61 @@ class Void:
     # search for a node
     def search(self, thing, parent):
         results = [n for n in self.nodes() if thing.lower() in n.lower()]
-        choice = self.offer_choice(results)
-        # TODO: add connection
-        return choice
+        if results:
+            print('search results:')
+            choice = self.offer_choice(results, default = 0)
+            self.reset_all_visits()
+            self.visit(choice)
+            return choice
+        else:
+            print('search: nothing found')
         
     # return string of neighbors of node
     def choose_neighbor(self, thing):
         if not self.contains(thing):
             return ''
         neighbors = self.neighbors(thing)
-        return self.offer_choice(neighbors, False)
+        return self.offer_choice(neighbors)
 
-    # return random neighbor (or just random node)
-    def spit(self, thing = None):
+    def visit(self, node):
+        assert(self.contains(node))
+        # weighted_visits increases as a node is repeatedly visited
+        if self.degree(node) > 0:
+            self.weighted_visits[node] += 1 / self.degree(node)
+
+    def unvisit(self, node):
+        assert(self.contains(node))
+        self.weighted_visits[node] = 0 
+            
+    def reset_all_visits(self):
+        self.weighted_visits = Counter()
+    
+    # return neighbor based on least visited (weighted)
+    def auto_traverse(self, thing = None):
         if self.is_empty():
             return ''
         options = []
         if self.contains(thing) and self.neighbors(thing):
             options = self.neighbors(thing)
+            # choose by weighted_visits heuristic, then by less neighbors first
+            options.sort(key = lambda n: (self.weighted_visits[n], self.degree(n)))
         else:
             options = self.nodes()
-        # choose by aversion heuristic, then by less neighbors first
-        options.sort(key = lambda n: (self.aversion[n], self.degree(n)))
+            # when jumping into the graph from scratch, start at the largest degree
+            options.sort(key = lambda n: -self.degree(n))
         choice = options[0]
-        # aversion increases as a node is repeatedly visited
-        if self.degree(choice) > 0:
-            self.aversion[choice] += 1 / self.degree(choice)
+        self.visit(choice)
+        return choice
+
+    # to nodes with more neighbors, and more visited (likely where we came from)
+    def auto_traverse_back(self, thing = None):
+        if self.is_empty() or (not self.contains(thing)) or (not self.neighbors(thing)):
+            return ''
+        self.unvisit(thing)
+        # choose by weighted_visits heuristic, then by more neighbors
+        options = self.neighbors(thing)
+        options.sort(key = lambda n: (-self.weighted_visits[n], -self.degree(n)))
+        choice = options[0]
         return choice
 
     # DISPLAY
@@ -180,18 +235,18 @@ class Void:
         print('archived!')
 
     def offer_archive(self):
-        if self.nodes() and self.offer_choice(['archive?']):
+        if self.nodes() and self.offer_choice(['archive?'], default = 0):
             self.archive()
 
     def offer_save(self):
-        if self.nodes() and self.modified and self.offer_choice(['save?']):
+        if self.nodes() and self.modified and self.offer_choice(['save?'], default = 0):
             self.save()
             
     def delete_save(self):
         if self.name not in self.saved_sessions(self.SAVE_DIR):
             print('session not saved')
             return
-        if self.offer_choice(['delete this save?']):
+        if self.offer_choice(['delete this save?'], default = 0):
             self.offer_archive()
             os.remove(self.SAVE_DIR + self.name)
             print('deleted!')
@@ -200,7 +255,7 @@ class Void:
         if self.name not in self.saved_sessions(self.ARCHIVE_DIR):
             print('session not archived')
             return
-        if self.offer_choice(['delete this archive?']):            
+        if self.offer_choice(['delete this archive?'], default = 0):            
             os.remove(self.ARCHIVE_DIR + self.name)
             print('deleted!')
 
@@ -216,6 +271,7 @@ class Void:
     def new_session(self):
         self.offer_save()
         self.__init__()
+        print('Welcome To The Void\n')
 
     # ADVANCED FEATURES
     # replace current node and its neighbors with new node
@@ -263,13 +319,13 @@ class Void:
             a, b = remaining.pop(), remaining.pop()
             choice = None
             while not choice:
-                choice = self.offer_choice([a, b])
+                choice = self.offer_choice([a, b], allow_rng = True)
                 if not choice and self.offer_choice(['quit picking?']):                   
                     print('Aborted')
                     return
             remaining.add(choice)
         chosen = remaining.pop()
-        print('Your mission is to explore: ' + str(chosen))
+        print('Chosen: ' + str(chosen))
         return chosen
         
     def __str__(self):
@@ -280,17 +336,18 @@ class Void:
         old = ''
         while True:
             # spit message and take input
-            new = input('(? for options): ' + old + '\n')
+            new = input('(? for options): {} \n'.format(old))
             # options info
             if new == '?':
                 print('''
 COMMANDS:
-    ?   - help 
+    ?   - help (online docs one day?)
     _   - create new node from here
-    /_  - search for node
-    //_ - search + connect to node
-    /n  - pick neighbor
     RET - auto traverse (less visited neighbor)
+    /b  - traverse back (most visited neighbor)
+    //_ - search for node
+    /+_ - search + connect to node
+    /n  - pick neighbor
     /g  - draw graph    
     /c  - condense node w/ neighbors
     /s  - save session
@@ -308,7 +365,9 @@ ADVANCED:
                 ''')
             # special commands start with /
             elif new and new[0] == '/':
-                if new == '/n' and old:
+                if new == '/b':
+                    old = self.auto_traverse_back(old)
+                elif new == '/n' and old:
                     result = self.choose_neighbor(old)
                     if result:
                         old = result
@@ -334,7 +393,7 @@ ADVANCED:
                     self.archive()
                 elif new == '/ln':
                     self.new_session()
-                    old = 'Welcome To the Void'
+                    old = ''
                 elif new == '/q':
                     return
                 elif new == '/pick':
@@ -344,22 +403,28 @@ ADVANCED:
                 elif new == '/compress':
                     self.compress()
                 else:
-                    # double slash = search with connection
-                    if len(new) > 1 and new[1] == '/':
+                    if len(new) > 1 and new[1] == '+':
+                        # search with connection
                         result = self.search(new[2:], old)
                         if result:
                             self.add(result, old)
                             old = result
-                    else:
-                        # single slash = normal search
-                        result = self.search(new[1:], old)
+                    elif len(new) > 1 and new[1] == '/':
+                        # normal search
+                        result = self.search(new[2:], old)
                         if result:
                             old = result
+                    else:
+                        print('unrecognized command')
+                        if self.offer_choice(['did you mean to search?'], default = 0):
+                            result = self.search(new[2:], old)
+                            if result:
+                                old = result
             # normal input
             elif new == '':
-                old = self.spit(old)
+                old = self.auto_traverse(old)
             else:
-                void.add(new, old)
+                self.add(new, old)
                 # automatically go to new thing when creating
                 old = new
 
