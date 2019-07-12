@@ -164,20 +164,23 @@ class Void:
             
     def reset_all_visits(self):
         self.weighted_visits = Counter()
-    
+
+    def primary_node(self):
+        options = self.nodes()
+        # largest degree, then shortest name
+        options.sort(key = lambda n: (-self.degree(n), len(n)))
+        return options[0]
+        
     # return neighbor based on least visited (weighted)
     def auto_traverse(self, thing = None):
         if self.is_empty():
             return ''
-        options = []
-        if self.contains(thing) and self.neighbors(thing):
-            options = self.neighbors(thing)
-            # choose by weighted_visits heuristic, then by less neighbors first
-            options.sort(key = lambda n: (self.weighted_visits[n], self.degree(n)))
-        else:
-            options = self.nodes()
-            # when jumping into the graph from scratch, start at the largest degree
-            options.sort(key = lambda n: -self.degree(n))
+        if not self.contains(thing) or not self.neighbors(thing):
+            # TODO: should visit here or nah?
+            return self.primary_node()
+        options = self.neighbors(thing)
+        # choose by weighted_visits heuristic, then by less neighbors first
+        options.sort(key = lambda n: (self.weighted_visits[n], self.degree(n)))
         choice = options[0]
         self.visit(choice)
         return choice
@@ -186,6 +189,8 @@ class Void:
     def auto_traverse_back(self, thing = None):
         if self.is_empty() or (not self.contains(thing)) or (not self.neighbors(thing)):
             return ''
+        # TODO: after back up will user expect avoiding the path?
+        # right now it will go right back down the smae nodes
         self.unvisit(thing)
         # choose by weighted_visits heuristic, then by more neighbors
         options = self.neighbors(thing)
@@ -281,9 +286,9 @@ class Void:
         print(thing)
         for n in neighbors:
             print(n)
-        default = neighbors[0] if len(neighbors) == 1 else 'dont condense'
+        default = neighbors[0] if len(neighbors) == 1 else 'CANCEL'
         new = self.ask_name_safe('[condense all ^ into single node]', default)
-        if new == 'dont condense':
+        if new == 'CANCEL':
             return
         # collect all nodes 2 away                     
         neighbors = self.neighbors(thing)
@@ -311,9 +316,9 @@ class Void:
                 result = self.condense(n)
         print('Done Compressing!')
 
-    # asks user to choose between until all but one are eliminated
+    # asks user to choose between random pairs until all but one are eliminated
     def pick_tournament(self):
-        print('let\'s pick something!')
+        print('let\'s pick something! (tournament style)')
         remaining = set(self.nodes())
         while len(remaining) > 1:
             a, b = remaining.pop(), remaining.pop()
@@ -327,6 +332,28 @@ class Void:
         chosen = remaining.pop()
         print('Chosen: ' + str(chosen))
         return chosen
+
+    # asks user to choose between neighbors from current node outward (faster)
+    def pick_branching(self, start_node = None):
+        if start_node == None:
+            start_node = self.primary_node()
+        print('let\'s pick something! (quick branching style)')
+        eliminated = set([])
+        options = self.neighbors(start_node) + [start_node]
+        choice = None
+        while len(options) > 1:
+            choice = None
+            while not choice:
+                choice = self.offer_choice(options, allow_rng = True)
+                if not choice and self.offer_choice(['quit picking?']):                   
+                    print('Aborted')
+                    return
+            eliminated.update(options)
+            next_batch = self.neighbors(choice) + [choice]
+            options = [ n for n in next_batch if n not in eliminated ]
+        print('Chosen: ' + str(choice))
+        return choice
+
         
     def __str__(self):
         return self.recap()
@@ -360,7 +387,8 @@ COMMANDS:
     /q  - quit
 
 ADVANCED:
-    /pick    - pick a node (tournament-style)
+    /pick     - pick a node (tournament-style)
+    /pick!    - pick a node (quick-branching-style)
     /compress - condense all leaf nodes in graph
                 ''')
             # special commands start with /
@@ -379,10 +407,10 @@ ADVANCED:
                         old = result
                 elif new == '/l':
                     self.load()
-                    old = self.name if self.contains(self.name) else ''
+                    old = self.auto_traverse()
                 elif new == '/la':
                     self.load(True)
-                    old = self.name if self.contains(self.name) else ''
+                    old = self.auto_traverse()
                 elif new == '/s':
                     self.save()
                 elif new == '/d':
@@ -398,6 +426,10 @@ ADVANCED:
                     return
                 elif new == '/pick':
                     chosen = self.pick_tournament()
+                    if chosen:
+                        old = chosen
+                elif new == '/pick!':
+                    chosen = self.pick_branching(old)
                     if chosen:
                         old = chosen
                 elif new == '/compress':
