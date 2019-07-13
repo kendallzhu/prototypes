@@ -52,21 +52,33 @@ class Void:
         self.modified = True
         self.things.add_edge(n1, n2)
 
-    # INTERACTIONS
-    # demand a string from user that can be used as name
-    def ask_name_safe(self, prompt = '', default = ''):
-        full_prompt = prompt + ':'
+    def is_valid_node_name(self, name):
+        return name and name[0] != '/'
+        
+    # INTERACTIONS    
+    # get a string from user that can be used as node, abort => None
+    def ask_node_name(self, prompt = '', default = None):
         if default:
-            full_prompt += ' (default - {})\n'.format(default)
-        while True:
-            thing = input(full_prompt)
-            if (not thing) and default:
-                thing = default
-            if not thing or '/' in thing or '.' in thing or '\\' in thing:
-                print('invalid, try again (no dots or slashes) \n')
-            else:
-                break
-        return thing
+            prompt += '(default - {})\n'.format(default)
+        name = input(prompt)
+        if (not name) and default:
+            name = default
+        if not self.is_valid_node_name(name):
+            print('invalid, aborting\n')
+            return None
+        return name
+    
+    # get a string from user that can be used as file name, can return None
+    def ask_file_name(self, prompt = '', default = ''):
+        if default:
+            prompt += ' (default - {})\n'.format(default)
+        name = input(prompt)
+        if (not name) and default:
+            name = default
+        if not name or '/' in name or '.' in name or '\\' in name:
+            print('invalid file name, aborting\n')
+            return None
+        return name
 
     # offer choices in a numbered list - returns None if no answer
     def offer_choice(self, options, **kwargs):
@@ -219,20 +231,29 @@ class Void:
                 sessions.append(f)
         return sessions
 
+    # change name of session and return it, return None if aborted
     def rename(self):
+        new_name = self.ask_file_name('save name: ', self.name)
+        if not new_name:
+            return
         self.modified = True
-        self.name = self.ask_name_safe('save name', self.name)
+        self.name = new_name
+        return new_name
     
     # write to file in main session folder
     def save(self):
-        self.rename()
+        new_name = self.rename()
+        if not new_name:
+            return
         nx.write_gml(self.things, self.SAVE_DIR + self.name)
         self.modified = False
         print('saved!')
         
     # write to file with timestamp into archives folder
     def archive(self):
-        self.rename()
+        new_name = self.rename()
+        if not new_name:
+            return
         timestamp = datetime.datetime.now()
         time_str =  timestamp.strftime('%m_%d_%y_%H%M%S')
         archive_name = self.name + '_' + time_str
@@ -286,9 +307,9 @@ class Void:
         print(thing)
         for n in neighbors:
             print(n)
-        default = neighbors[0] if len(neighbors) == 1 else 'CANCEL'
-        new = self.ask_name_safe('[condense all ^ into single node]', default)
-        if new == 'CANCEL':
+        default = neighbors[0] if len(neighbors) == 1 else None
+        new = self.ask_node_name('[condense all ^ into single node]: \n', default)
+        if not new:
             return
         # collect all nodes 2 away                     
         neighbors = self.neighbors(thing)
@@ -455,10 +476,12 @@ ADVANCED:
             # normal input
             elif new == '':
                 old = self.auto_traverse(old)
-            else:
+            elif self.is_valid_node_name(new):
                 self.add(new, old)
                 # automatically go to new thing when creating
                 old = new
+            else:
+                print('invalid node name, try again\n')
 
 if __name__ == '__main__':
     try:
