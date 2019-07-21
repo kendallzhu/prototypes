@@ -18,6 +18,8 @@ class Void:
         self.things = nx.Graph()
         # for traversal heuristic
         self.weighted_visits = Counter()
+        # for traversing back
+        self.visit_history = []
         # initialize colorama for windows, but not if on eshell
         if os.name == 'nt' and not('EMACS_DIR' in os.environ):
             init()
@@ -63,7 +65,7 @@ class Void:
     def print_welcome(self):
         print(Style.BRIGHT + 'Welcome To The Void' + Style.RESET_ALL)
         
-    def print_focus(self, node, **kwargs):
+    def print_current(self, node, **kwargs):
         print(Fore.GREEN + node + Style.RESET_ALL, **kwargs)
 
     def print_prompt(self, node, **kwargs):
@@ -80,7 +82,7 @@ class Void:
             self.print_default('(default - {})\n'.format(default), end = '')
         name = input()
         if (not name) and default:
-            print(defualt)
+            print(default)
             name = default
         if not self.is_valid_node_name(name):
             print('invalid, aborting\n')
@@ -94,7 +96,7 @@ class Void:
             self.print_default('(default - {})\n'.format(default), end = '')
         name = input()
         if (not name) and default:
-            print(defualt)
+            print(default)
             name = default
         if not name or '/' in name or '.' in name or '\\' in name:
             print('invalid file name, aborting\n')
@@ -195,11 +197,8 @@ class Void:
         # weighted_visits increases as a node is repeatedly visited
         if self.degree(node) > 0:
             self.weighted_visits[node] += 1 / self.degree(node)
+        self.visit_history.append(node)
 
-    def unvisit(self, node):
-        assert(self.contains(node))
-        self.weighted_visits[node] = 0 
-            
     def reset_all_visits(self):
         self.weighted_visits = Counter()
 
@@ -224,17 +223,12 @@ class Void:
         return choice
 
     # to nodes with more neighbors, and more visited (likely where we came from)
-    def auto_traverse_back(self, thing = None):
-        if self.is_empty() or (not self.contains(thing)) or (not self.neighbors(thing)):
+    def traverse_back(self, thing):
+        if self.is_empty() or not self.visit_history or not self.contains(thing):
             return ''
-        # TODO: after back up will user expect avoiding the path?
-        # right now it will go right back down the smae nodes
-        self.unvisit(thing)
-        # choose by weighted_visits heuristic, then by more neighbors
-        options = self.neighbors(thing)
-        options.sort(key = lambda n: (-self.weighted_visits[n], -self.degree(n)))
-        choice = options[0]
-        return choice
+        if thing == self.visit_history[-1]:
+            self.visit_history.pop()
+        return self.visit_history.pop()
 
     # VISUALIZATION
     # draw graph in new window
@@ -315,9 +309,9 @@ class Void:
         directory = self.ARCHIVE_DIR if archive else self.SAVE_DIR
         name = self.offer_choice(self.saved_sessions(directory))
         if name:
+            self.__init__()
             self.things = nx.read_gml(directory + name)
             self.name = name
-            self.modified = False
             print('loaded!')
 
     def new_session(self):
@@ -416,7 +410,7 @@ class Void:
         while True:
             # spit message and take input
             self.print_prompt('(? for options): ', end = '')
-            self.print_focus(old)
+            self.print_current(old)
             new = input()
             # options info
             if new == '?':
@@ -425,7 +419,7 @@ COMMANDS:
     ?   - help (online docs one day?)
     _   - create new node from here
     RET - auto traverse (less visited neighbor)
-    /b  - traverse back (most visited neighbor)
+    /b  - traverse back
     //_ - search for node
     /+_ - search + connect to node
     /n  - pick neighbor
@@ -448,7 +442,9 @@ ADVANCED:
             # special commands start with /
             elif new and new[0] == '/':
                 if new == '/b':
-                    old = self.auto_traverse_back(old)
+                    result = self.traverse_back(old)
+                    if result:
+                        old = result
                 elif new == '/n' and old:
                     result = self.choose_neighbor(old)
                     if result:
@@ -502,7 +498,7 @@ ADVANCED:
                             old = result
                     else:
                         print('unrecognized command')
-                        if self.offer_choice(['did you mean to search?'], default = 0):
+                        if len(new) > 1 and self.offer_choice(['did you mean to search?']):
                             result = self.search(new[2:], old)
                             if result:
                                 old = result
