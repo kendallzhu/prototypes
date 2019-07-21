@@ -26,10 +26,10 @@ class Void:
         return thing in self.things
 
     def neighbors(self, node):
-        return list(self.things[node])
+        return sorted(list(self.things[node]), key = lambda n: -self.degree(n))
 
     def degree(self, node):
-        return len(self.neighbors(node))
+        return len(self.things[node])
 
     def delete_node(self, node):
         self.modified = True
@@ -71,7 +71,7 @@ class Void:
     # get a string from user that can be used as file name, can return None
     def ask_file_name(self, prompt = '', default = ''):
         if default:
-            prompt += ' (default - {})\n'.format(default)
+            prompt += '(default - {})\n'.format(default)
         name = input(prompt)
         if (not name) and default:
             name = default
@@ -102,12 +102,12 @@ class Void:
             else:
                 print('invalid choice, picking no')
                 return
-        print('\n')
+        print('')
         for i, r in enumerate(options):
             print (str(i) + ') ' + r)
         # multiple options - numerical list
         if allow_rng:
-            print('(decimal (0, 1) => rng option 0)')
+            print('(decimal => rng for option 0)')
         if default:
             prompt = 'choose # or search (default - {}):'.format(default)
         else:
@@ -127,13 +127,13 @@ class Void:
             except:
                 probability = 0
             # only interpret decimals between 0 and 1 exclusive as probabilities
-            if probability > 0 and probability < 1:
+            if choice[0] == '.' or (probability > 0 and probability < 1):
                 if random.random() < probability:
                     return options[0]
                 else:
                     if len(options) == 2:
                         return options[1]
-                    return self.offer_choice(options[1:])
+                    return self.offer_choice(options[1:], allow_rng = True)
         # try narrow options by search
         else:
             searched_options = [o for o in options if choice.lower() in o.lower()]
@@ -151,8 +151,9 @@ class Void:
         if results:
             print('search results:')
             choice = self.offer_choice(results, default = 0)
-            self.reset_all_visits()
-            self.visit(choice)
+            if choice:
+                self.reset_all_visits()
+                self.visit(choice)
             return choice
         else:
             print('search: nothing found')
@@ -341,14 +342,19 @@ class Void:
     def pick_tournament(self):
         print('let\'s pick something! (tournament style)')
         remaining = set(self.nodes())
+        least_played = set(remaining)
         while len(remaining) > 1:
-            a, b = remaining.pop(), remaining.pop()
+            if len(least_played) <= 1:
+                least_played = set(remaining)
+            a, b = least_played.pop(), least_played.pop()
             choice = None
             while not choice:
                 choice = self.offer_choice([a, b], allow_rng = True)
-                if not choice and self.offer_choice(['quit picking?']):                   
+                if not choice and self.offer_choice(['quit picking?'], default = 0):
                     print('Aborted')
                     return
+            remaining.remove(a)
+            remaining.remove(b)
             remaining.add(choice)
         chosen = remaining.pop()
         print('Chosen: ' + str(chosen))
