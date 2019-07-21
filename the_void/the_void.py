@@ -5,6 +5,7 @@ import datetime
 import networkx as nx
 import matplotlib.pyplot as plt
 from collections import Counter
+from colorama import init, Fore, Back, Style
 
 # undirected graph of thoughts/ideas/questions
 class Void:
@@ -17,6 +18,9 @@ class Void:
         self.things = nx.Graph()
         # for traversal heuristic
         self.weighted_visits = Counter()
+        # initialize colorama for windows, but not if on eshell
+        if os.name == 'nt' and not('EMACS_DIR' in os.environ):
+            init()
 
     # BASIC UTILITIES
     def is_empty(self):
@@ -54,14 +58,29 @@ class Void:
 
     def is_valid_node_name(self, name):
         return name and name[0] != '/'
+
+    # DISPLAY + STYLES
+    def print_welcome(self):
+        print(Style.BRIGHT + 'Welcome To The Void' + Style.RESET_ALL)
+        
+    def print_focus(self, node, **kwargs):
+        print(Fore.GREEN + node + Style.RESET_ALL, **kwargs)
+
+    def print_prompt(self, node, **kwargs):
+        print(Style.BRIGHT + node + Style.RESET_ALL, **kwargs)
+
+    def print_default(self, text, **kwargs):
+        print(Fore.MAGENTA + text + Style.RESET_ALL, **kwargs)
         
     # INTERACTIONS    
     # get a string from user that can be used as node, abort => None
     def ask_node_name(self, prompt = '', default = None):
+        self.print_prompt(prompt, end = '')
         if default:
-            prompt += '(default - {})\n'.format(default)
-        name = input(prompt)
+            self.print_default('(default - {})\n'.format(default), end = '')
+        name = input()
         if (not name) and default:
+            print(defualt)
             name = default
         if not self.is_valid_node_name(name):
             print('invalid, aborting\n')
@@ -70,10 +89,12 @@ class Void:
     
     # get a string from user that can be used as file name, can return None
     def ask_file_name(self, prompt = '', default = ''):
+        print(prompt, end = '')
         if default:
-            prompt += '(default - {})\n'.format(default)
-        name = input(prompt)
+            self.print_default('(default - {})\n'.format(default), end = '')
+        name = input()
         if (not name) and default:
+            print(defualt)
             name = default
         if not name or '/' in name or '.' in name or '\\' in name:
             print('invalid file name, aborting\n')
@@ -92,10 +113,12 @@ class Void:
         # special y/n query for single option, always default
         if len(options) == 1:
             default_string = 'y' if default == 0 else 'n'
-            prompt = '0) {} (y/n, default {})\n'.format(options[0], default_string)
-            choice = input(prompt)
+            print('0) ' + options[0], end = '')
+            self.print_default(' (y/n, default {})\n'.format(default_string), end = '')
+            choice = input()
             if choice == 'y' or choice == '0' or choice == options[0] or \
                (choice == '' and default == 0):
+                print('y')
                 return options[0]
             elif choice == 'n' or default != 0:
                 return
@@ -107,18 +130,20 @@ class Void:
             print (str(i) + ') ' + r)
         # multiple options - numerical list
         if allow_rng:
-            print('(decimal => rng for option 0)')
+            self.print_default('(decimal => rng for option 0)')
         if default:
             prompt = 'choose # or search (default - {}):'.format(default)
         else:
             prompt = 'choose # or search:'
-        choice = input(prompt + '\n')
+        self.print_prompt(prompt)
+        choice = input()
         if choice.isdigit() and int(choice) < len(options):
             return options[int(choice)]
         # choosing via typing the exact contents
         elif choice in options:
             return choice
         elif not choice and default:
+            print(default)
             return options[default]
         # see if user input probability for first option
         elif allow_rng:
@@ -211,7 +236,7 @@ class Void:
         choice = options[0]
         return choice
 
-    # DISPLAY
+    # VISUALIZATION
     # draw graph in new window
     def draw(self):
         if self.things:
@@ -298,7 +323,7 @@ class Void:
     def new_session(self):
         self.offer_save()
         self.__init__()
-        print('Welcome To The Void\n')
+        self.print_welcome()
 
     # ADVANCED FEATURES
     # replace current node and its neighbors with new node
@@ -386,11 +411,13 @@ class Void:
         return self.recap()
 
     def loop(self):
-        print('Welcome to the Void')
+        self.print_welcome()
         old = ''
         while True:
             # spit message and take input
-            new = input('(? for options): {} \n'.format(old))
+            self.print_prompt('(? for options): ', end = '')
+            self.print_focus(old)
+            new = input()
             # options info
             if new == '?':
                 print('''
