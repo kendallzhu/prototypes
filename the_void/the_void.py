@@ -234,7 +234,34 @@ class Void:
     # draw graph in new window
     def draw(self):
         if self.things:
-            nx.draw_kamada_kawai(self.things, with_labels=True, font_weight='bold')
+            print('Drawing Graph...', flush=True)
+            # copy graph with line breaks - TODO: factor out edit? map?
+            def insert_newlines(string, every):
+                lines = []
+                start = 0
+                while start < len(string):
+                    end = start + every
+                    while end < len(string) and string[end] !=  ' ':
+                        end += 1
+                    lines.append(string[start:end])
+                    start = end
+                return '\n'.join(lines)
+            pretty_version = nx.Graph()
+            pretty_version.add_nodes_from(self.things)
+            pretty_version.add_edges_from(self.things.edges)
+            for node in [n for n in pretty_version.nodes()]:
+                neighbors = pretty_version[node]
+                pretty_version.remove_node(node)
+                new = insert_newlines(node, 20)
+                pretty_version.add_node(new)
+                for n in neighbors:
+                    pretty_version.add_edge(new, n)
+            nx.draw_kamada_kawai(pretty_version, with_labels=True, font_weight='bold')
+            mng = plt.get_current_fig_manager()
+            # mng.window.state('zoomed')
+            # hack to cause window focus, not sure why it works
+            mng.window.state('iconic')
+            mng.window.minsize(width = 1080, height = 640)
             plt.show()
         else:
             print('nothing to draw yet')
@@ -354,7 +381,7 @@ class Void:
         print('Try condensing edge nodes\n')
         for n in self.nodes():
             if n in self.nodes() and self.degree(n) < 2:
-                result = self.condense(n)
+                _ = self.condense(n)
         print('Done Compressing!')
 
     # asks user to choose between random pairs until all but one are eliminated
