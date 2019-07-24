@@ -3,6 +3,9 @@ import traceback
 import random
 import datetime
 import networkx as nx
+# hack to make use same backend
+import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 from collections import Counter
 from colorama import init, Fore, Back, Style
