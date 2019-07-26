@@ -61,6 +61,19 @@ class Void:
         self.modified = True
         self.things.add_edge(n1, n2)
 
+    # not really a class function but I think clearer to put here
+    @staticmethod
+    def edit_networkX_node(graph, node, new):
+        neighbors = graph[node]
+        graph.remove_node(node)
+        graph.add_node(new)
+        for n in neighbors:
+            graph.add_edge(new, n)
+        
+    def edit_node(self, node, new):
+        self.modified = True
+        Void.edit_networkX_node(self.things, node, new)
+
     def is_valid_node_name(self, name):
         return name and name[0] != '/'
 
@@ -238,7 +251,7 @@ class Void:
     def draw(self):
         if self.things:
             print('Drawing Graph...', flush=True)
-            # copy graph with line breaks - TODO: factor out edit? map?
+            # copy prettified version of the map
             def insert_newlines(string, every):
                 lines = []
                 start = 0
@@ -249,16 +262,11 @@ class Void:
                     lines.append(string[start:end])
                     start = end
                 return '\n'.join(lines)
-            pretty_version = nx.Graph()
-            pretty_version.add_nodes_from(self.things)
-            pretty_version.add_edges_from(self.things.edges)
+            def format_node_text(string):
+                return insert_newlines(string, 20)
+            pretty_version = self.things.copy()
             for node in [n for n in pretty_version.nodes()]:
-                neighbors = pretty_version[node]
-                pretty_version.remove_node(node)
-                new = insert_newlines(node, 20)
-                pretty_version.add_node(new)
-                for n in neighbors:
-                    pretty_version.add_edge(new, n)
+                Void.edit_networkX_node(pretty_version, node, format_node_text(node))
             nx.draw_kamada_kawai(pretty_version, with_labels=True, font_weight='bold')
             mng = plt.get_current_fig_manager()
             # mng.window.state('zoomed')
@@ -350,6 +358,15 @@ class Void:
         self.print_welcome()
 
     # ADVANCED FEATURES
+    # relabel the current node
+    def edit(self, thing):
+        new = self.ask_node_name('edit node to: ', thing)
+        if not new:
+            print('invalid')
+            return
+        self.edit_node(thing, new)
+        return new
+    
     # replace current node and its neighbors with new node
     def condense(self, thing):
         print('\n')
@@ -454,6 +471,7 @@ COMMANDS:
     /+_ - search + connect to node
     /n  - pick neighbor
     /g  - draw graph    
+    /e  - edit node 
     /c  - condense node w/ neighbors
     /s  - save session
     /l  - load saved session
@@ -481,6 +499,10 @@ ADVANCED:
                         old = result
                 elif new == '/g':
                     self.draw()
+                elif new == '/e':
+                    result = self.edit(old)
+                    if result:
+                        old = result                    
                 elif new == '/c' and old:
                     result = self.condense(old)
                     if result:
