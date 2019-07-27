@@ -252,7 +252,7 @@ class Void:
     # draw graph in new window
     def draw(self):
         if self.things:
-            print('Drawing Graph...', flush=True)
+            print('Drawing Graph... \n(Close graph window to resume)', flush=True)
             # copy prettified version of the map
             def insert_newlines(string, every):
                 lines = []
@@ -276,7 +276,8 @@ class Void:
                 pretty_version,
                 with_labels=True,
                 font_weight='bold',
-                node_color='#ff6200'
+                node_color='#00a400'
+                # node_color='#ff6200'
             )
             mng = plt.get_current_fig_manager()
             # mng.window.state('zoomed')
