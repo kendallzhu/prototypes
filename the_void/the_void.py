@@ -172,9 +172,11 @@ class Void:
             # only interpret decimals between 0 and 1 exclusive as probabilities
             if choice[0] == '.' or (probability > 0 and probability < 1):
                 if random.random() < probability:
+                    print(options[0])
                     return options[0]
                 else:
                     if len(options) == 2:
+                        print(options[1])
                         return options[1]
                     return self.offer_choice(options[1:], allow_rng = True)
         # try narrow options by search
@@ -257,22 +259,31 @@ class Void:
                 start = 0
                 while start < len(string):
                     end = start + every
-                    while end < len(string) and string[end] !=  ' ':
-                        end += 1
+                    while end < len(string) and string[end] != ' ':
+                        end -= 1
+                        if end == start:
+                            end = start + every
+                            break
                     lines.append(string[start:end])
                     start = end
                 return '\n'.join(lines)
             def format_node_text(string):
-                return insert_newlines(string, 20)
+                return insert_newlines(string, 22)
             pretty_version = self.things.copy()
             for node in [n for n in pretty_version.nodes()]:
                 Void.edit_networkX_node(pretty_version, node, format_node_text(node))
-            nx.draw_kamada_kawai(pretty_version, with_labels=True, font_weight='bold')
+            nx.draw_kamada_kawai(
+                pretty_version,
+                with_labels=True,
+                font_weight='bold',
+                node_color='#ff6200'
+            )
             mng = plt.get_current_fig_manager()
             # mng.window.state('zoomed')
             # hack to cause window focus, not sure why it works
             mng.window.state('iconic')
             mng.window.minsize(width = 1080, height = 640)
+            plt.margins(x=.12)
             plt.show()
         else:
             print('nothing to draw yet')
@@ -525,6 +536,7 @@ ADVANCED:
                     self.new_session()
                     old = ''
                 elif new == '/q':
+                    self.offer_save()
                     return
                 elif new == '/pick':
                     chosen = self.pick_tournament()
