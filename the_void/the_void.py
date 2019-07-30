@@ -23,6 +23,8 @@ class Void:
         self.weighted_visits = Counter()
         # for traversing back
         self.visit_history = []
+        # for getting recent additions
+        self.recently_added = []
         # initialize colorama for windows, but not if on eshell
         if os.name == 'nt' and not('EMACS_DIR' in os.environ):
             init()
@@ -54,12 +56,24 @@ class Void:
             self.name = thing
         if not self.contains(thing):
             self.things.add_node(thing)
+            self.set_time_created(thing)
         if parent and parent not in self.neighbors(thing):
             self.things.add_edge(parent, thing)
 
     def add_edge(self, n1, n2):
         self.modified = True
         self.things.add_edge(n1, n2)
+
+    # functions for creation timestamps (to keep the constants in one place)
+    def set_time_created(self, node):
+        assert(node in self.things)
+        self.things.nodes[node]['time_created'] = datetime.datetime.now()
+        
+    def get_time_created(self, node):
+        if 'time_created' in self.things.nodes[node]:
+            return self.things.nodes[node]['time_created']
+        else:
+            return datetime.datetime.min
 
     # not really a class function but I think clearer to put here
     @staticmethod
@@ -76,6 +90,15 @@ class Void:
 
     def is_valid_node_name(self, name):
         return name and name[0] != '/'
+
+    def get_recent(self, number):
+        nodes_by_time = sorted(self.nodes(), key=lambda n: self.get_time_created(n))
+        nodes_by_time.reverse()
+        num_return = min(number, len(nodes_by_time))
+        return nodes_by_time[0:num_return]
+
+    def debug_print(self):
+        print(self.things.nodes.data())
 
     # DISPLAY + STYLES
     def print_welcome(self):
@@ -203,12 +226,16 @@ class Void:
         else:
             print('search: nothing found')
         
-    # return string of neighbors of node
     def choose_neighbor(self, thing):
         if not self.contains(thing):
             return ''
         neighbors = self.neighbors(thing)
         return self.offer_choice(neighbors)
+
+    def choose_recent(self):
+        print('Recently added:')
+        recents = self.get_recent(5)
+        return self.offer_choice(recents)
 
     def visit(self, node):
         assert(self.contains(node))
@@ -482,9 +509,12 @@ COMMANDS:
     //_ - search for node
     /+_ - search + connect to node
     /n  - pick neighbor
+    /r  - pick recent
     /g  - draw graph    
     /e  - edit node 
     /c  - condense node w/ neighbors
+
+SESSIONS:
     /s  - save session
     /l  - load saved session
     /a  - archive session
@@ -497,7 +527,7 @@ COMMANDS:
 ADVANCED:
     /pick     - pick a node (tournament-style)
     /pick!    - pick a node (quick-branching-style)
-    /compress - condense all leaf nodes in graph
+    /compress - try condensing all leaf nodes in graph
                 ''')
             # special commands start with /
             elif new and new[0] == '/':
@@ -507,6 +537,10 @@ ADVANCED:
                         old = result
                 elif new == '/n' and old:
                     result = self.choose_neighbor(old)
+                    if result:
+                        old = result
+                elif new == '/r' and old:
+                    result = self.choose_recent()
                     if result:
                         old = result
                 elif new == '/g':
@@ -549,6 +583,8 @@ ADVANCED:
                         old = chosen
                 elif new == '/compress':
                     self.compress()
+                elif new == '/debug':
+                    self.debug_print()                
                 else:
                     if len(new) > 1 and new[1] == '+':
                         # search with connection
