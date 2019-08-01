@@ -13,7 +13,7 @@ from colorama import init, Fore, Back, Style
 # undirected graph of thoughts/ideas/questions
 class Void:
     SAVE_DIR = './saved_sessions/'
-    ARCHIVE_DIR = './saved_sessions/archive/'
+    SNAPSHOT_DIR = './saved_sessions/snapshots/'
     def __init__(self):
         self.modified = False
         self.name = ''
@@ -42,7 +42,7 @@ class Void:
     def degree(self, node):
         return len(self.things[node])
 
-    def delete_node(self, node):
+    def remove_node_and_edges(self, node):
         self.modified = True
         self.things.remove_node(node)
 
@@ -349,23 +349,24 @@ class Void:
         self.modified = False
         print('saved!')
         
-    # write to file with timestamp into archives folder
-    def archive(self):
+    # write to file with timestamp into snapshots folder
+    def snapshot(self):
         new_name = self.rename()
         if not new_name:
             return
         timestamp = datetime.datetime.now()
         time_str =  timestamp.strftime('%m_%d_%y_%H%M%S')
-        archive_name = self.name + '_' + time_str
-        nx.write_gml(self.things, self.ARCHIVE_DIR + archive_name)
-        print('archived!')
+        snapshot_name = self.name + '_' + time_str
+        nx.write_gml(self.things, self.SNAPSHOT_DIR + snapshot_name)
+        print('snapshot taken!')
 
-    def offer_archive(self):
-        if self.nodes() and self.offer_choice(['archive?'], default = 0):
-            self.archive()
+    def offer_snapshot(self):
+        if self.nodes() and self.offer_choice(['take snapshot?'], default = 0):
+            self.snapshot()
 
     def offer_save(self):
-        if self.nodes() and self.modified and self.offer_choice(['save?'], default = 0):
+        if self.nodes() and self.modified and \
+           self.offer_choice(['session modified, save?'], default = 0):
             self.save()
             
     def delete_save(self):
@@ -373,21 +374,21 @@ class Void:
             print('session not saved')
             return
         if self.offer_choice(['delete this save?'], default = 0):
-            self.offer_archive()
+            self.offer_snapshot()
             os.remove(self.SAVE_DIR + self.name)
             print('deleted!')
             self.new_session()
 
-    def delete_archive(self):
-        if self.name not in self.saved_sessions(self.ARCHIVE_DIR):
-            print('session not archived')
+    def delete_snapshot(self):
+        if self.name not in self.saved_sessions(self.SNAPSHOT_DIR):
+            print('snapshot aborted')
             return
-        if self.offer_choice(['delete this archive?'], default = 0):            
-            os.remove(self.ARCHIVE_DIR + self.name)
+        if self.offer_choice(['delete this snapshot?'], default = 0):            
+            os.remove(self.SNAPSHOT_DIR + self.name)
             print('deleted!')
 
-    def load(self, archive = False):
-        directory = self.ARCHIVE_DIR if archive else self.SAVE_DIR
+    def load(self, snapshot = False):
+        directory = self.SNAPSHOT_DIR if snapshot else self.SAVE_DIR
         name = self.offer_choice(self.saved_sessions(directory))
         if name:
             self.__init__()
@@ -409,6 +410,21 @@ class Void:
             return
         self.edit_node(thing, new)
         return new
+
+    # delete the current node - only works if 2 or less neighbors
+    def delete_node(self, node):
+        if self.degree(node) > 2:
+            print('must have 2 or less neighbors to delete (can try condense)')
+            return
+        neighbors = self.things[node]
+        self.things.remove_node(node)
+        for n1 in neighbors:
+            for n2 in neighbors:
+                if n1 != n2:
+                    self.things.add_edge(n1, n2)
+        print('deleted!')
+        self.modified = True
+        return list(neighbors)[0] if neighbors else None
     
     # replace current node and its neighbors with new node
     def condense(self, thing):
@@ -429,18 +445,19 @@ class Void:
                 if n2 != thing and n2 not in neighbors:
                     two_away.append(n2)
         # remove node and all neighbors
-        self.delete_node(thing)
+        self.things.remove_node(thing)
         for n in neighbors:
-            self.delete_node(n)
+            self.things.remove_node(n)
         # add replacement with kept edges
         self.add(new)
         for n in two_away:
             self.add_edge(new, n)
+        self.modified = True
         return new
 
     # offer comprehensive review of graph
     def compress(self):
-        self.offer_archive()
+        self.offer_snapshot()
         print('Try condensing edge nodes\n')
         for n in self.nodes():
             if n in self.nodes() and self.degree(n) < 2:
@@ -516,15 +533,16 @@ COMMANDS:
     /r  - pick recent
     /g  - draw graph    
     /e  - edit node 
+    /d  - delete node
     /c  - condense node w/ neighbors
 
 SESSIONS + SNAPSHOTS:
     /s  - save session
     /l  - load session
+    /x  - delete session
     /ss - save snapshot
-    /d  - delete session
-    /la - load archive
-    /da - delete archive
+    /ls - load snapshot
+    /xs - delete snapshot
     /ln - new session
     /q  - quit
 
@@ -552,25 +570,29 @@ ADVANCED:
                 elif new == '/e':
                     result = self.edit(old)
                     if result:
-                        old = result                    
+                        old = result
+                elif new == '/d' and old:
+                    result = self.delete_node(old)
+                    if result:
+                        old = result
                 elif new == '/c' and old:
                     result = self.condense(old)
                     if result:
                         old = result
+                elif new == '/s':
+                    self.save()
                 elif new == '/l':
                     self.load()
                     old = self.auto_traverse()
-                elif new == '/la':
+                elif new == '/x':
+                    self.delete_save()
+                elif new == '/ss':
+                    self.snapshot()
+                elif new == '/ls':
                     self.load(True)
                     old = self.auto_traverse()
-                elif new == '/s':
-                    self.save()
-                elif new == '/d':
-                    self.delete_save()
-                elif new == '/da':
-                    self.delete_archive()
-                elif new == '/a':
-                    self.archive()
+                elif new == '/xs':
+                    self.delete_snapshot()
                 elif new == '/ln':
                     self.new_session()
                     old = ''
