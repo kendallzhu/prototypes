@@ -67,11 +67,14 @@ class Void:
     # functions for creation timestamps (to keep the constants in one place)
     def set_time_created(self, node):
         assert(node in self.things)
-        self.things.nodes[node]['time_created'] = datetime.datetime.now()
+        epoch = datetime.datetime.utcfromtimestamp(0)
+        timestamp = datetime.datetime.now()
+        epoch_time =  (timestamp - epoch).total_seconds()
+        self.things.nodes[node]['timeCreated'] = epoch_time
         
     def get_time_created(self, node):
         if 'time_created' in self.things.nodes[node]:
-            return self.things.nodes[node]['time_created']
+            return self.things.nodes[node]['timeCreated']
         else:
             return datetime.datetime.min
 
@@ -373,6 +376,7 @@ class Void:
             self.offer_archive()
             os.remove(self.SAVE_DIR + self.name)
             print('deleted!')
+            self.new_session()
 
     def delete_archive(self):
         if self.name not in self.saved_sessions(self.ARCHIVE_DIR):
@@ -514,10 +518,10 @@ COMMANDS:
     /e  - edit node 
     /c  - condense node w/ neighbors
 
-SESSIONS:
+SESSIONS + SNAPSHOTS:
     /s  - save session
-    /l  - load saved session
-    /a  - archive session
+    /l  - load session
+    /ss - save snapshot
     /d  - delete session
     /la - load archive
     /da - delete archive
