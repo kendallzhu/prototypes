@@ -160,15 +160,18 @@ class Void:
             print('0) ' + options[0], end = '')
             self.print_default(' (y/n, default {})\n'.format(default_string), end = '')
             choice = input()
-            if choice == 'y' or choice == '0' or choice == options[0] or \
-               (choice == '' and default == 0):
-                print('y')
+            if choice == 'y' or choice == '0' or choice == options[0]:
                 return options[0]
-            elif choice == 'n' or default != 0:
+            if choice == '' and default == 0:
+                print('defaulting - yes')
+                return options[0]
+            if choice == 'n':
                 return
-            else:
-                print('invalid choice, picking no')
+            if choice == '' and default != 0:
+                print('defaulting - no')
                 return
+            print('invalid choice, picking no')
+            return
         print('')
         for i, r in enumerate(options):
             print (str(i) + ') ' + r)
@@ -218,6 +221,7 @@ class Void:
     # NAVIGATION
     # search for a node
     def search(self, thing, parent):
+        thing = thing.strip()
         results = [n for n in self.nodes() if thing.lower() in n.lower()]
         if results:
             print('search results:')
@@ -306,7 +310,7 @@ class Void:
                 pretty_version,
                 with_labels=True,
                 font_weight='bold',
-                node_color='#00a400'
+                node_color='#00a400',
                 # node_color='#ff6200'
             )
             mng = plt.get_current_fig_manager()
@@ -361,12 +365,12 @@ class Void:
         print('snapshot taken!')
 
     def offer_snapshot(self):
-        if self.nodes() and self.offer_choice(['take snapshot?'], default = 0):
+        if self.nodes() and self.offer_choice(['take snapshot?']):
             self.snapshot()
 
     def offer_save(self):
         if self.nodes() and self.modified and \
-           self.offer_choice(['session modified, save?'], default = 0):
+           self.offer_choice(['session modified, save?']):
             self.save()
             
     def delete_save(self):
@@ -376,7 +380,8 @@ class Void:
         if self.offer_choice(['delete this save?'], default = 0):
             self.offer_snapshot()
             os.remove(self.SAVE_DIR + self.name)
-            print('deleted!')
+            print('Deleted!')
+            self.modified = False
             self.new_session()
 
     def delete_snapshot(self):
@@ -385,6 +390,7 @@ class Void:
             return
         if self.offer_choice(['delete this snapshot?'], default = 0):            
             os.remove(self.SNAPSHOT_DIR + self.name)
+            self.modified = False
             print('deleted!')
 
     def load(self, snapshot = False):
@@ -405,16 +411,22 @@ class Void:
     # relabel the current node
     def edit(self, thing):
         new = self.ask_node_name('edit node to: ', thing)
-        if not new:
+        if new == None or (not new.strip()):
             print('invalid')
             return
         self.edit_node(thing, new)
         return new
 
+    def can_delete(self, node):
+        for n in self.neighbors(node):
+            if self.degree(n) == 1:
+                return False
+        return True
+    
     # delete the current node - only works if 2 or less neighbors
     def delete_node(self, node):
-        if self.degree(node) > 2:
-            print('must have 2 or less neighbors to delete (can try condense)')
+        if not self.can_delete(node):
+            print('deleting would orphan a node (can try condense)')
             return
         neighbors = self.things[node]
         self.things.remove_node(node)
@@ -430,12 +442,13 @@ class Void:
     def condense(self, thing):
         print('\n')
         neighbors = self.neighbors(thing)
-        print(thing)
         for n in neighbors:
             print(n)
+        self.print_current(thing)        
         default = neighbors[0] if len(neighbors) == 1 else None
         new = self.ask_node_name('[condense all ^ into single node]: \n', default)
         if not new:
+            print('did not condense')
             return
         # collect all nodes 2 away                     
         neighbors = self.neighbors(thing)
@@ -455,13 +468,28 @@ class Void:
         self.modified = True
         return new
 
-    # offer comprehensive review of graph
+    # offer comprehensive review + pruning of graph
     def compress(self):
         self.offer_snapshot()
-        print('Try condensing edge nodes\n')
+        print('\nReview and Compress!\n')
+        print('Step 1: Edit nodes\n')
         for n in self.nodes():
-            if n in self.nodes() and self.degree(n) < 2:
-                _ = self.condense(n)
+            print("\n(neighbors):")
+            for neighbor in self.neighbors(n):
+                print(neighbor)
+            self.print_current(n)
+            new = self.edit(n)
+            if not (new and new != n) and self.offer_choice(['delete?']):
+                    self.delete_node(n)
+            if not new and self.offer_choice(['abort review?'], default = 0):
+                print('Review aborted!')
+                return
+        print('Step 2: condense/delete nodes\n')
+        for n in self.nodes():
+            if n in self.nodes():
+                condensed = self.condense(n)
+                if not self.offer_choice(['continue?'], default = 0):
+                    break
         print('Done Compressing!')
 
     # asks user to choose between random pairs until all but one are eliminated
@@ -630,7 +658,7 @@ ADVANCED:
                             if result:
                                 old = result
             # normal input
-            elif new == '':
+            elif type(new) == str and new.strip() == '':
                 old = self.auto_traverse(old)
             elif self.is_valid_node_name(new):
                 self.add(new, old)
