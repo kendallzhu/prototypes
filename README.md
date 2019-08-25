@@ -1,6 +1,6 @@
 # prototypes
 
-The Void - minimalist command line mind-mapping tool. Designed for light brainstorming, note-taking and thinking.
+The Void - minimalist command line mind-mapping tool. Designed for brainstorming, note-taking and todos.
 - To install dependencies, run ```pip install -r requirements.txt```
 - To run the void, cd into the_void and type: ```python the_void.py```
 - Recommended usage: type small stuff, and press Enter to cycle through things you've typed.
