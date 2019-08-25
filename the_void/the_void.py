@@ -64,6 +64,17 @@ class Void:
         self.modified = True
         self.things.add_edge(n1, n2)
 
+    def remove_edge(self, n1, n2):
+        if self.degree(n1) == 1 or self.degree(n2) == 1:
+            print('removing edge would orphan node, aborting')
+            return
+        self.things.remove_edge(n1, n2)
+        if not self.things.has_path(n1, n2):
+            print('removing edge would disconnect graph, aborting')
+            self.things.add_edge(n1, n2)
+            return
+        self.modified = True
+
     # functions for creation timestamps (to keep the constants in one place)
     def set_time_created(self, node):
         assert(node in self.things)
@@ -220,7 +231,7 @@ class Void:
 
     # NAVIGATION
     # search for a node
-    def search(self, thing, parent):
+    def search(self, thing):
         thing = thing.strip()
         results = [n for n in self.nodes() if thing.lower() in n.lower()]
         if results:
@@ -394,6 +405,7 @@ class Void:
             print('deleted!')
 
     def load(self, snapshot = False):
+        self.offer_save()
         directory = self.SNAPSHOT_DIR if snapshot else self.SAVE_DIR
         name = self.offer_choice(self.saved_sessions(directory))
         if name:
@@ -408,6 +420,20 @@ class Void:
         self.print_welcome()
 
     # ADVANCED FEATURES
+    # add new node as a leaf to another node, picked after writing this one
+    def add_leaf(self):
+        new = self.ask_node_name('new node: ')
+        if not new:
+            print('abort add new')
+            return
+        query = input('Search for base connection: ')
+        base = self.search(query)
+        if not base:
+            print('abort add new')
+            return        
+        self.add(new, base)
+        return new
+        
     # relabel the current node
     def edit(self, thing):
         new = self.ask_node_name('edit node to: ', thing)
@@ -416,6 +442,22 @@ class Void:
             return
         self.edit_node(thing, new)
         return new
+
+    # allow repicking the connections of a node
+    def move(self, thing):
+        assert(thing in self.nodes())
+        query = input('Search for New Connection?: ')
+        new_connection = self.search(query)
+        while self.is_valid_node_name(new_connection):            
+            self.add(new_connection, thing)
+            query = input('Search for New Connection?: ')
+            new_connection = self.search(query)
+        print('Remove Existing Connections?')
+        to_remove = self.offer_choice(self.neighbors(thing))
+        while to_remove:
+            self.remove_edge(thing, to_remove)
+            to_remove = self.offer_choice(self.neighbors(thing))
+        print('Done Moving!')
 
     def can_delete(self, node):
         for n in self.neighbors(node):
@@ -469,6 +511,32 @@ class Void:
         return new
 
     # offer comprehensive review + pruning of graph
+    def grow(self):
+        self.offer_snapshot()
+        print('\nExpand and Rearrange!\n')
+        print('Step 1: Add New Nodes? \n')
+        print('Step 2: Edit, Move and Add Children\n')
+        # go from least degree first, to give chances to move leaves
+        for n in reversed(self.nodes()):
+            print("\n(neighbors):")
+            for neighbor in self.neighbors(n):
+                print(neighbor)
+            self.print_current(n)
+            new = self.edit(n)
+            if new == None and self.offer_choice(['abort grow?'], default = 0):
+                print('Grow aborted!')
+                return
+            n = new if new != None else n
+            if self.offer_choice(['move?']):
+                self.move(n)
+            if self.offer_choice(['add children?']):                
+                child = input('new child: ')
+                while self.is_valid_node_name(child):
+                    self.add(child, n)
+                    child = input('new child: ')
+        print('Done Growing!')
+    
+    # offer comprehensive review + pruning of graph
     def compress(self):
         self.offer_snapshot()
         print('\nReview and Compress!\n')
@@ -480,7 +548,7 @@ class Void:
             self.print_current(n)
             new = self.edit(n)
             if not (new and new != n) and self.offer_choice(['delete?']):
-                    self.delete_node(n)
+                self.delete_node(n)
             if not new and self.offer_choice(['abort review?'], default = 0):
                 print('Review aborted!')
                 return
@@ -557,11 +625,13 @@ COMMANDS:
     /b  - traverse back
     //_ - search for node
     /+_ - search + connect to node
-    /n  - pick neighbor
-    /r  - pick recent
-    /g  - draw graph    
+    /n  - neighbors
+    /r  - recent nodes
+    /g  - draw graph
+    /a  - add node
     /e  - edit node 
     /d  - delete node
+    /m  - move node
     /c  - condense node w/ neighbors
 
 SESSIONS + SNAPSHOTS:
@@ -575,9 +645,10 @@ SESSIONS + SNAPSHOTS:
     /q  - quit
 
 ADVANCED:
-    /pick     - pick a node (tournament-style)
-    /pick!    - pick a node (quick-branching-style)
-    /compress - try condensing all leaf nodes in graph
+    /pick     - pick a node (tournament)
+    /pick!    - pick a node (branch-from-current)
+    /grow     - expand + rearrange entire graph
+    /compress - review + condense entire graph
                 ''')
             # special commands start with /
             elif new and new[0] == '/':
@@ -595,12 +666,20 @@ ADVANCED:
                         old = result
                 elif new == '/g':
                     self.draw()
+                elif new == '/a':
+                    result = self.add_leaf()
+                    if result:
+                        old = result                    
                 elif new == '/e':
                     result = self.edit(old)
                     if result:
                         old = result
                 elif new == '/d' and old:
                     result = self.delete_node(old)
+                    if result:
+                        old = result
+                elif new == '/m':
+                    result = self.move(old)
                     if result:
                         old = result
                 elif new == '/c' and old:
@@ -635,6 +714,8 @@ ADVANCED:
                     chosen = self.pick_branching(old)
                     if chosen:
                         old = chosen
+                elif new == '/grow':
+                    self.grow()
                 elif new == '/compress':
                     self.compress()
                 elif new == '/debug':
@@ -642,19 +723,19 @@ ADVANCED:
                 else:
                     if len(new) > 1 and new[1] == '+':
                         # search with connection
-                        result = self.search(new[2:], old)
+                        result = self.search(new[2:])
                         if result:
                             self.add(result, old)
                             old = result
                     elif len(new) > 1 and new[1] == '/':
                         # normal search
-                        result = self.search(new[2:], old)
+                        result = self.search(new[2:])
                         if result:
                             old = result
                     else:
                         print('unrecognized command')
                         if len(new) > 1 and self.offer_choice(['did you mean to search?']):
-                            result = self.search(new[2:], old)
+                            result = self.search(new[2:])
                             if result:
                                 old = result
             # normal input
