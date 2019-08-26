@@ -1,19 +1,21 @@
-import sys, os
+import os
 import traceback
 import random
 import datetime
 import networkx as nx
 # hack to make use same backend
-import matplotlib
-matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 from collections import Counter
-from colorama import init, Fore, Back, Style
+from colorama import init, Fore, Style
+import matplotlib
+matplotlib.use('TkAgg')
+
 
 # undirected graph of thoughts/ideas/questions
 class Void:
     SAVE_DIR = './saved_sessions/'
     SNAPSHOT_DIR = './saved_sessions/snapshots/'
+
     def __init__(self):
         self.modified = False
         self.name = ''
@@ -32,12 +34,12 @@ class Void:
     # BASIC UTILITIES
     def is_empty(self):
         return not self.things
-    
+
     def contains(self, thing):
         return thing in self.things
 
     def neighbors(self, node):
-        return sorted(list(self.things[node]), key = lambda n: -self.degree(n))
+        return sorted(list(self.things[node]), key=lambda n: -self.degree(n))
 
     def degree(self, node):
         return len(self.things[node])
@@ -47,10 +49,10 @@ class Void:
         self.things.remove_node(node)
 
     def nodes(self):
-        return sorted(list(self.things), key = lambda n: -self.degree(n))
-    
+        return sorted(list(self.things), key=lambda n: -self.degree(n))
+
     # insert a new thing into the void from parent
-    def add(self, thing, parent = None):
+    def add(self, thing, parent=None):
         self.modified = True
         if not self.name:
             self.name = thing
@@ -69,7 +71,7 @@ class Void:
             print('removing edge would orphan node, aborting')
             return
         self.things.remove_edge(n1, n2)
-        if not self.things.has_path(n1, n2):
+        if not nx.has_path(self.things, n1, n2):
             print('removing edge would disconnect graph, aborting')
             self.things.add_edge(n1, n2)
             return
@@ -80,9 +82,9 @@ class Void:
         assert(node in self.things)
         epoch = datetime.datetime.utcfromtimestamp(0)
         timestamp = datetime.datetime.now()
-        epoch_time =  (timestamp - epoch).total_seconds()
+        epoch_time = (timestamp - epoch).total_seconds()
         self.things.nodes[node]['timeCreated'] = epoch_time
-        
+
     def get_time_created(self, node):
         if 'time_created' in self.things.nodes[node]:
             return self.things.nodes[node]['timeCreated']
@@ -97,7 +99,7 @@ class Void:
         graph.add_node(new)
         for n in neighbors:
             graph.add_edge(new, n)
-        
+
     def edit_node(self, node, new):
         self.modified = True
         Void.edit_networkX_node(self.things, node, new)
@@ -106,7 +108,7 @@ class Void:
         return name and name[0] != '/'
 
     def get_recent(self, number):
-        nodes_by_time = sorted(self.nodes(), key=lambda n: self.get_time_created(n))
+        nodes_by_time = sorted(self.nodes(), key=self.get_time_created)
         nodes_by_time.reverse()
         num_return = min(number, len(nodes_by_time))
         return nodes_by_time[0:num_return]
@@ -117,7 +119,7 @@ class Void:
     # DISPLAY + STYLES
     def print_welcome(self):
         print(Style.BRIGHT + 'Welcome To The Void' + Style.RESET_ALL)
-        
+
     def print_current(self, node, **kwargs):
         print(Fore.GREEN + node + Style.RESET_ALL, **kwargs)
 
@@ -126,13 +128,19 @@ class Void:
 
     def print_default(self, text, **kwargs):
         print(Fore.MAGENTA + text + Style.RESET_ALL, **kwargs)
-        
-    # INTERACTIONS    
+
+    def print_with_neighbors(self, node):
+        print("\n(neighbors):")
+        for neighbor in self.neighbors(node):
+            print(neighbor)
+        self.print_current(node)
+
+    # INTERACTIONS
     # get a string from user that can be used as node, abort => None
-    def ask_node_name(self, prompt = '', default = None):
-        self.print_prompt(prompt, end = '')
+    def ask_node_name(self, prompt='', default=None):
+        self.print_prompt(prompt, end='')
         if default:
-            self.print_default('(default - {})\n'.format(default), end = '')
+            self.print_default('(default - {})\n'.format(default), end='')
         name = input()
         if (not name) and default:
             print(default)
@@ -141,12 +149,12 @@ class Void:
             print('invalid, aborting\n')
             return None
         return name
-    
+
     # get a string from user that can be used as file name, can return None
-    def ask_file_name(self, prompt = '', default = ''):
-        print(prompt, end = '')
+    def ask_file_name(self, prompt='', default=''):
+        print(prompt, end='')
         if default:
-            self.print_default('(default - {})\n'.format(default), end = '')
+            self.print_default('(default - {})\n'.format(default), end='')
         name = input()
         if (not name) and default:
             print(default)
@@ -167,9 +175,9 @@ class Void:
             default = None
         # special y/n query for single option, always default
         if len(options) == 1:
-            default_string = 'y' if default == 0 else 'n'
-            print('0) ' + options[0], end = '')
-            self.print_default(' (y/n, default {})\n'.format(default_string), end = '')
+            print('0) ' + options[0], end='')
+            def_s = 'y' if default == 0 else 'n'
+            self.print_default(' (y/n, default {})\n'.format(def_s), end='')
             choice = input()
             if choice == 'y' or choice == '0' or choice == options[0]:
                 return options[0]
@@ -185,7 +193,7 @@ class Void:
             return
         print('')
         for i, r in enumerate(options):
-            print (str(i) + ') ' + r)
+            print(str(i) + ') ' + r)
         # multiple options - numerical list
         if allow_rng:
             self.print_default('(decimal => rng for option 0)')
@@ -207,9 +215,9 @@ class Void:
         elif allow_rng:
             try:
                 probability = float(choice)
-            except:
+            except ValueError:
                 probability = 0
-            # only interpret decimals between 0 and 1 exclusive as probabilities
+            # only interpret decimals between 0 and 1 exclusive as probability
             if choice[0] == '.' or (probability > 0 and probability < 1):
                 if random.random() < probability:
                     print(options[0])
@@ -218,13 +226,13 @@ class Void:
                     if len(options) == 2:
                         print(options[1])
                         return options[1]
-                    return self.offer_choice(options[1:], allow_rng = True)
+                    return self.offer_choice(options[1:], allow_rng=True)
         # try narrow options by search
         else:
-            searched_options = [o for o in options if choice.lower() in o.lower()]
-            if choice and searched_options:
+            searched = [o for o in options if choice.lower() in o.lower()]
+            if choice and searched:
                 print('*narrowed options by search*')
-                return self.offer_choice(searched_options, default = 0)
+                return self.offer_choice(searched, default=0)
             else:
                 print('invalid choice')
                 return
@@ -236,14 +244,14 @@ class Void:
         results = [n for n in self.nodes() if thing.lower() in n.lower()]
         if results:
             print('search results:')
-            choice = self.offer_choice(results, default = 0)
+            choice = self.offer_choice(results, default=0)
             if choice:
                 self.reset_all_visits()
                 self.visit(choice)
             return choice
         else:
             print('search: nothing found')
-        
+
     def choose_neighbor(self, thing):
         if not self.contains(thing):
             return ''
@@ -268,11 +276,11 @@ class Void:
     def primary_node(self):
         options = self.nodes()
         # largest degree, then shortest name
-        options.sort(key = lambda n: (-self.degree(n), len(n)))
+        options.sort(key=lambda n: (-self.degree(n), len(n)))
         return options[0]
-        
+
     # return neighbor based on least visited (weighted)
-    def auto_traverse(self, thing = None):
+    def auto_traverse(self, thing=None):
         if self.is_empty():
             return ''
         if not self.contains(thing) or not self.neighbors(thing):
@@ -280,16 +288,16 @@ class Void:
             return self.primary_node()
         options = self.neighbors(thing)
         # choose by weighted_visits heuristic, then by less neighbors first
-        options.sort(key = lambda n: (self.weighted_visits[n], self.degree(n)))
+        options.sort(key=lambda n: (self.weighted_visits[n], self.degree(n)))
         choice = options[0]
         self.visit(choice)
         return choice
 
-    # to nodes with more neighbors, and more visited (likely where we came from)
-    def traverse_back(self, thing):
-        if self.is_empty() or not self.visit_history or not self.contains(thing):
+    # to nodes with more neighbors and more visited (likely where we came from)
+    def traverse_back(self, n):
+        if self.is_empty() or not self.visit_history or not self.contains(n):
             return ''
-        if thing == self.visit_history[-1]:
+        if n == self.visit_history[-1]:
             self.visit_history.pop()
         return self.visit_history.pop()
 
@@ -297,7 +305,8 @@ class Void:
     # draw graph in new window
     def draw(self):
         if self.things:
-            print('Drawing Graph... \n(Close graph window to resume)', flush=True)
+            print('Drawing Graph... \n(Close window to resume)', flush=True)
+
             # copy prettified version of the map
             def insert_newlines(string, every):
                 lines = []
@@ -312,11 +321,13 @@ class Void:
                     lines.append(string[start:end])
                     start = end
                 return '\n'.join(lines)
+
             def format_node_text(string):
                 return insert_newlines(string, 22)
             pretty_version = self.things.copy()
             for node in [n for n in pretty_version.nodes()]:
-                Void.edit_networkX_node(pretty_version, node, format_node_text(node))
+                text = format_node_text(node)
+                Void.edit_networkX_node(pretty_version, node, text)
             nx.draw_kamada_kawai(
                 pretty_version,
                 with_labels=True,
@@ -328,7 +339,7 @@ class Void:
             # mng.window.state('zoomed')
             # hack to cause window focus, not sure why it works
             mng.window.state('iconic')
-            mng.window.minsize(width = 1080, height = 640)
+            mng.window.minsize(width=1080, height=640)
             plt.margins(x=.12)
             plt.show()
         else:
@@ -339,8 +350,10 @@ class Void:
         sessions = []
         files = []
         files = os.listdir(directory)
-        get_path = lambda f: os.path.join(directory + f)
-        files.sort(key = lambda f: os.path.getmtime(get_path(f)))
+
+        def get_path(name):
+            return os.path.join(directory + f)
+        files.sort(key=lambda f: os.path.getmtime(get_path(f)))
         for f in files:
             if os.path.isfile(get_path(f)) and '.' not in f:
                 sessions.append(f)
@@ -354,7 +367,7 @@ class Void:
         self.modified = True
         self.name = new_name
         return new_name
-    
+
     # write to file in main session folder
     def save(self):
         new_name = self.rename()
@@ -363,14 +376,14 @@ class Void:
         nx.write_gml(self.things, self.SAVE_DIR + self.name)
         self.modified = False
         print('saved!')
-        
+
     # write to file with timestamp into snapshots folder
     def snapshot(self):
         new_name = self.rename()
         if not new_name:
             return
         timestamp = datetime.datetime.now()
-        time_str =  timestamp.strftime('%m_%d_%y_%H%M%S')
+        time_str = timestamp.strftime('%m_%d_%y_%H%M%S')
         snapshot_name = self.name + '_' + time_str
         nx.write_gml(self.things, self.SNAPSHOT_DIR + snapshot_name)
         print('snapshot taken!')
@@ -383,12 +396,12 @@ class Void:
         if self.nodes() and self.modified and \
            self.offer_choice(['session modified, save?']):
             self.save()
-            
+
     def delete_save(self):
         if self.name not in self.saved_sessions(self.SAVE_DIR):
             print('session not saved')
             return
-        if self.offer_choice(['delete this save?'], default = 0):
+        if self.offer_choice(['delete this save?'], default=0):
             self.offer_snapshot()
             os.remove(self.SAVE_DIR + self.name)
             print('Deleted!')
@@ -399,12 +412,12 @@ class Void:
         if self.name not in self.saved_sessions(self.SNAPSHOT_DIR):
             print('snapshot aborted')
             return
-        if self.offer_choice(['delete this snapshot?'], default = 0):            
+        if self.offer_choice(['delete this snapshot?'], default=0):
             os.remove(self.SNAPSHOT_DIR + self.name)
             self.modified = False
             print('deleted!')
 
-    def load(self, snapshot = False):
+    def load(self, snapshot=False):
         self.offer_save()
         directory = self.SNAPSHOT_DIR if snapshot else self.SAVE_DIR
         name = self.offer_choice(self.saved_sessions(directory))
@@ -430,14 +443,14 @@ class Void:
         base = self.search(query)
         if not base:
             print('abort add new')
-            return        
+            return
         self.add(new, base)
         return new
-        
+
     # relabel the current node
     def edit(self, thing):
         new = self.ask_node_name('edit node to: ', thing)
-        if new == None or (not new.strip()):
+        if new is None or (not new.strip()):
             print('invalid')
             return
         self.edit_node(thing, new)
@@ -446,17 +459,21 @@ class Void:
     # allow repicking the connections of a node
     def move(self, thing):
         assert(thing in self.nodes())
-        query = input('Search for New Connection?: ')
-        new_connection = self.search(query)
-        while self.is_valid_node_name(new_connection):            
+        while True:
+            query = input('Make New Connection (? - search any): ')
+            if not self.is_valid_node_name(query):
+                break
+            new_connection = self.search('' if query == '?' else query)
+            if not self.is_valid_node_name(new_connection):
+                break
             self.add(new_connection, thing)
-            query = input('Search for New Connection?: ')
-            new_connection = self.search(query)
+        print('Done Adding Connections!\n')
         print('Remove Existing Connections?')
-        to_remove = self.offer_choice(self.neighbors(thing))
-        while to_remove:
-            self.remove_edge(thing, to_remove)
+        while self.degree(thing) > 1:
             to_remove = self.offer_choice(self.neighbors(thing))
+            if not to_remove:
+                break
+            self.remove_edge(thing, to_remove)
         print('Done Moving!')
 
     def can_delete(self, node):
@@ -464,7 +481,7 @@ class Void:
             if self.degree(n) == 1:
                 return False
         return True
-    
+
     # delete the current node - only works if 2 or less neighbors
     def delete_node(self, node):
         if not self.can_delete(node):
@@ -479,20 +496,20 @@ class Void:
         print('deleted!')
         self.modified = True
         return list(neighbors)[0] if neighbors else None
-    
+
     # replace current node and its neighbors with new node
     def condense(self, thing):
         print('\n')
         neighbors = self.neighbors(thing)
         for n in neighbors:
             print(n)
-        self.print_current(thing)        
+        self.print_current(thing)
         default = neighbors[0] if len(neighbors) == 1 else None
-        new = self.ask_node_name('[condense all ^ into single node]: \n', default)
+        new = self.ask_node_name('[condense all ^ into]: \n', default)
         if not new:
             print('did not condense')
             return
-        # collect all nodes 2 away                     
+        # collect all nodes 2 away
         neighbors = self.neighbors(thing)
         two_away = []
         for n in neighbors:
@@ -514,49 +531,48 @@ class Void:
     def grow(self):
         self.offer_snapshot()
         print('\nExpand and Rearrange!\n')
-        print('Step 1: Add New Nodes? \n')
-        print('Step 2: Edit, Move and Add Children\n')
+        print('Step 1: Add New Nodes')
+        while True:
+            new = self.add_leaf()
+            if not new and self.offer_choice(['done adding?'], default=0):
+                print('Done Adding New Nodes!')
+                break
+        print('\nStep 2: Edit, Move and Add Children\n')
         # go from least degree first, to give chances to move leaves
         for n in reversed(self.nodes()):
-            print("\n(neighbors):")
-            for neighbor in self.neighbors(n):
-                print(neighbor)
-            self.print_current(n)
+            self.print_with_neighbors(n)
             new = self.edit(n)
-            if new == None and self.offer_choice(['abort grow?'], default = 0):
+            if new is None and self.offer_choice(['abort grow?'], default=0):
                 print('Grow aborted!')
                 return
-            n = new if new != None else n
-            if self.offer_choice(['move?']):
-                self.move(n)
-            if self.offer_choice(['add children?']):                
-                child = input('new child: ')
-                while self.is_valid_node_name(child):
-                    self.add(child, n)
-                    child = input('new child: ')
+            n = new if new is not None else n
+            self.move(n)
+            while True:
+                child = self.ask_node_name('new child?: ')
+                if not child:
+                    print('Done adding children!')
+                    break
+                self.add(child, n)
         print('Done Growing!')
-    
+
     # offer comprehensive review + pruning of graph
     def compress(self):
         self.offer_snapshot()
         print('\nReview and Compress!\n')
         print('Step 1: Edit nodes\n')
         for n in self.nodes():
-            print("\n(neighbors):")
-            for neighbor in self.neighbors(n):
-                print(neighbor)
-            self.print_current(n)
+            self.print_with_neighbors(n)
             new = self.edit(n)
             if not (new and new != n) and self.offer_choice(['delete?']):
                 self.delete_node(n)
-            if not new and self.offer_choice(['abort review?'], default = 0):
+            if not new and self.offer_choice(['abort review?'], default=0):
                 print('Review aborted!')
                 return
         print('Step 2: condense/delete nodes\n')
         for n in self.nodes():
             if n in self.nodes():
-                condensed = self.condense(n)
-                if not self.offer_choice(['continue?'], default = 0):
+                self.condense(n)
+                if not self.offer_choice(['continue?'], default=0):
                     break
         print('Done Compressing!')
 
@@ -571,8 +587,8 @@ class Void:
             a, b = least_played.pop(), least_played.pop()
             choice = None
             while not choice:
-                choice = self.offer_choice([a, b], allow_rng = True)
-                if not choice and self.offer_choice(['quit picking?'], default = 0):
+                choice = self.offer_choice([a, b], allow_rng=True)
+                if not choice and self.offer_choice(['quit pick?'], default=0):
                     print('Aborted')
                     return
             remaining.remove(a)
@@ -583,8 +599,8 @@ class Void:
         return chosen
 
     # asks user to choose between neighbors from current node outward (faster)
-    def pick_branching(self, start_node = None):
-        if start_node == None:
+    def pick_branching(self, start_node=None):
+        if start_node is None:
             start_node = self.primary_node()
         print('let\'s pick something! (quick branching style)')
         eliminated = set([])
@@ -593,17 +609,16 @@ class Void:
         while len(options) > 1:
             choice = None
             while not choice:
-                choice = self.offer_choice(options, allow_rng = True)
-                if not choice and self.offer_choice(['quit picking?']):                   
+                choice = self.offer_choice(options, allow_rng=True)
+                if not choice and self.offer_choice(['quit picking?']):
                     print('Aborted')
                     return
             eliminated.update(options)
             next_batch = self.neighbors(choice) + [choice]
-            options = [ n for n in next_batch if n not in eliminated ]
+            options = [n for n in next_batch if n not in eliminated]
         print('Chosen: ' + str(choice))
         return choice
 
-        
     def __str__(self):
         return self.recap()
 
@@ -612,13 +627,13 @@ class Void:
         old = ''
         while True:
             # spit message and take input
-            self.print_prompt('(? for options): ', end = '')
+            self.print_prompt('(? for options): ', end='')
             self.print_current(old)
             new = input()
             # options info
             if new == '?':
                 print('''
-COMMANDS:
+BASIC COMMANDS:
     ?   - help (online docs one day?)
     _   - create new node from here
     RET - auto traverse (less visited neighbor)
@@ -629,7 +644,7 @@ COMMANDS:
     /r  - recent nodes
     /g  - draw graph
     /a  - add node
-    /e  - edit node 
+    /e  - edit node
     /d  - delete node
     /m  - move node
     /c  - condense node w/ neighbors
@@ -644,7 +659,7 @@ SESSIONS + SNAPSHOTS:
     /ln - new session
     /q  - quit
 
-ADVANCED:
+GUIDED PROCESSES:
     /pick     - pick a node (tournament)
     /pick!    - pick a node (branch-from-current)
     /grow     - expand + rearrange entire graph
@@ -669,7 +684,7 @@ ADVANCED:
                 elif new == '/a':
                     result = self.add_leaf()
                     if result:
-                        old = result                    
+                        old = result
                 elif new == '/e':
                     result = self.edit(old)
                     if result:
@@ -719,7 +734,7 @@ ADVANCED:
                 elif new == '/compress':
                     self.compress()
                 elif new == '/debug':
-                    self.debug_print()                
+                    self.debug_print()
                 else:
                     if len(new) > 1 and new[1] == '+':
                         # search with connection
@@ -734,7 +749,8 @@ ADVANCED:
                             old = result
                     else:
                         print('unrecognized command')
-                        if len(new) > 1 and self.offer_choice(['did you mean to search?']):
+                        if len(new) > 1 and \
+                           self.offer_choice(['did you mean to search?']):
                             result = self.search(new[2:])
                             if result:
                                 old = result
@@ -748,10 +764,11 @@ ADVANCED:
             else:
                 print('invalid node name, try again\n')
 
+
 if __name__ == '__main__':
     try:
         # initiate session
         void = Void()
         void.loop()
-    except Exception as _:
+    except Exception:
         print(traceback.format_exc())
