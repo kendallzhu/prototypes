@@ -10,4 +10,4 @@ The Void - minimalist command line mind-mapping tool. Designed for brainstorming
 - Guided commands initiate processes to help drive progress when stuck:
   - /pick - Tournament-style bracket to pick a node (useful for todos!).
   - /grow - Review entire graph rearrange and grow nodes one at a time
-  - /compress - Review entire graph delete and condense nodes one at a time
+  - /refactor - Review and refactor entire graph one node at a time
