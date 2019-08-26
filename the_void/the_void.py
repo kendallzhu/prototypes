@@ -53,6 +53,12 @@ class Void:
 
     # insert a new thing into the void from parent
     def add(self, thing, parent=None):
+        if type(thing) != str:
+            print('Can only add strings as nodes!')
+            return
+        if not self.is_valid_node_name(thing):
+            print('Invalid node name')
+            return
         self.modified = True
         if not self.name:
             self.name = thing
@@ -352,7 +358,7 @@ class Void:
         files = os.listdir(directory)
 
         def get_path(name):
-            return os.path.join(directory + f)
+            return os.path.join(directory + name)
         files.sort(key=lambda f: os.path.getmtime(get_path(f)))
         for f in files:
             if os.path.isfile(get_path(f)) and '.' not in f:
@@ -460,8 +466,8 @@ class Void:
     def move(self, thing):
         assert(thing in self.nodes())
         while True:
-            query = input('Make New Connection (? - search any): ')
-            if not self.is_valid_node_name(query):
+            query = self.ask_node_name('New Connection (? - search any): ')
+            if not query:
                 break
             new_connection = self.search('' if query == '?' else query)
             if not self.is_valid_node_name(new_connection):
@@ -504,8 +510,7 @@ class Void:
         for n in neighbors:
             print(n)
         self.print_current(thing)
-        default = neighbors[0] if len(neighbors) == 1 else None
-        new = self.ask_node_name('[condense all ^ into]: \n', default)
+        new = self.ask_node_name('[condense all ^ into]: \n')
         if not new:
             print('did not condense')
             return
@@ -527,54 +532,53 @@ class Void:
         self.modified = True
         return new
 
-    # offer comprehensive review + pruning of graph
-    def grow(self):
+    # offer comprehensive review + refactor of graph
+    def refactor(self):
         self.offer_snapshot()
-        print('\nExpand and Rearrange!\n')
+        print('\nRefactor!\n')
         print('Step 1: Add New Nodes')
         while True:
             new = self.add_leaf()
             if not new and self.offer_choice(['done adding?'], default=0):
                 print('Done Adding New Nodes!')
                 break
-        print('\nStep 2: Edit, Move and Add Children\n')
+        print('\nStep 2: Refactor Each Node\n')
         # go from least degree first, to give chances to move leaves
         for n in reversed(self.nodes()):
-            self.print_with_neighbors(n)
-            new = self.edit(n)
-            if new is None and self.offer_choice(['abort grow?'], default=0):
-                print('Grow aborted!')
-                return
-            n = new if new is not None else n
-            self.move(n)
             while True:
-                child = self.ask_node_name('new child?: ')
-                if not child:
-                    print('Done adding children!')
+                self.print_with_neighbors(n)
+                print('Actions:')
+                action = self.offer_choice([
+                    'edit',
+                    'delete',
+                    'move',
+                    'add children',
+                    'condense',
+                    'abort refactor'
+                ])
+                if action is None:
+                    print('Done with Node!')
                     break
-                self.add(child, n)
-        print('Done Growing!')
-
-    # offer comprehensive review + pruning of graph
-    def compress(self):
-        self.offer_snapshot()
-        print('\nReview and Compress!\n')
-        print('Step 1: Edit nodes\n')
-        for n in self.nodes():
-            self.print_with_neighbors(n)
-            new = self.edit(n)
-            if not (new and new != n) and self.offer_choice(['delete?']):
-                self.delete_node(n)
-            if not new and self.offer_choice(['abort review?'], default=0):
-                print('Review aborted!')
-                return
-        print('Step 2: condense/delete nodes\n')
-        for n in self.nodes():
-            if n in self.nodes():
-                self.condense(n)
-                if not self.offer_choice(['continue?'], default=0):
+                elif action == 'edit':
+                    new = self.edit(n)
+                elif action == 'delete':
+                    self.remove_node_and_edges(n)
                     break
-        print('Done Compressing!')
+                elif action == 'move':
+                    self.move(n)
+                elif action == 'add children':
+                    while True:
+                        child = self.ask_node_name('new child?: ')
+                        if not child:
+                            print('Done adding children!')
+                            break
+                        self.add(child, n)
+                elif action == 'condense':
+                    self.condense(n)
+                elif action == 'abort refactor':
+                    print('Refactor aborted!')
+                    return
+        print('Done Refactoring!')
 
     # asks user to choose between random pairs until all but one are eliminated
     def pick_tournament(self):
@@ -629,7 +633,7 @@ class Void:
             # spit message and take input
             self.print_prompt('(? for options): ', end='')
             self.print_current(old)
-            new = input()
+            new = input().strip()
             # options info
             if new == '?':
                 print('''
@@ -662,8 +666,7 @@ SESSIONS + SNAPSHOTS:
 GUIDED PROCESSES:
     /pick     - pick a node (tournament)
     /pick!    - pick a node (branch-from-current)
-    /grow     - expand + rearrange entire graph
-    /compress - review + condense entire graph
+    /refactor - review + refactor entire graph
                 ''')
             # special commands start with /
             elif new and new[0] == '/':
@@ -729,10 +732,8 @@ GUIDED PROCESSES:
                     chosen = self.pick_branching(old)
                     if chosen:
                         old = chosen
-                elif new == '/grow':
-                    self.grow()
-                elif new == '/compress':
-                    self.compress()
+                elif new == '/refactor':
+                    self.refactor()
                 elif new == '/debug':
                     self.debug_print()
                 else:
