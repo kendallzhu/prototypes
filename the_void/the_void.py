@@ -3,10 +3,9 @@ import traceback
 import random
 import datetime
 import networkx as nx
-# hack to make use same backend
-import matplotlib.pyplot as plt
 from collections import Counter
 from colorama import init, Fore, Style
+# hack to make use same backend
 import matplotlib
 matplotlib.use('TkAgg')
 
@@ -342,13 +341,13 @@ class Void:
                 node_color='#00a400',
                 # node_color='#ff6200'
             )
-            mng = plt.get_current_fig_manager()
+            mng = matplotlib.pyplot.get_current_fig_manager()
             # mng.window.state('zoomed')
             # hack to cause window focus, not sure why it works
             mng.window.state('iconic')
             mng.window.minsize(width=1080, height=640)
-            plt.margins(x=.12)
-            plt.show()
+            matplotlib.pyplot.margins(x=.12)
+            matplotlib.pyplot.show()
         else:
             print('nothing to draw yet')
 
@@ -550,10 +549,10 @@ class Void:
                 self.print_with_neighbors(n)
                 print('Actions:')
                 action = self.offer_choice([
+                    'add children',
                     'edit',
                     'delete',
                     'move',
-                    'add children',
                     'condense',
                     'abort refactor'
                 ])
