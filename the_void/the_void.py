@@ -560,10 +560,13 @@ class Void:
                     print('Done with Node!')
                     break
                 elif action == 'edit':
-                    new = self.edit(n)
+                    n = self.edit(n)
                 elif action == 'delete':
-                    self.remove_node_and_edges(n)
-                    break
+                    if self.can_delete(n):
+                        self.remove_node_and_edges(n)
+                        break
+                    else:
+                        print('can\'t delete, try move instead?')
                 elif action == 'move':
                     self.move(n)
                 elif action == 'add children':
