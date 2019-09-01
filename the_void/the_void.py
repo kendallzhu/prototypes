@@ -441,18 +441,27 @@ class Void:
         self.print_welcome()
 
     # ADVANCED FEATURES
-    # add new node as a leaf to another node, picked after writing this one
-    def add_leaf(self):
+    # add completely new node and connect as many others to it as desired
+    def add_new(self):
         new = self.ask_node_name('new node: ')
         if not new:
             print('aborting add new')
             return
-        query = input('Search for base connection: ')
-        base = self.search(query)
-        if not base:
-            print('aborting add new')
-            return
-        self.add(new, base)
+        num_added = 0
+        while True:
+            query = self.ask_node_name('Find New Connection:')
+            if not query:
+                if num_added > 0:
+                    break
+                else:
+                    query = ''
+            new_connection = self.search(query)
+            if self.is_valid_node_name(new_connection):
+                self.add(new_connection, new)
+                num_added += 1
+            elif num_added > 0:
+                break
+        print('done adding connections!\n')
         return new
 
     # relabel the current node
@@ -541,7 +550,7 @@ class Void:
         print('\nRefactor!\n')
         print('Step 1: Add New Nodes')
         while True:
-            new = self.add_leaf()
+            new = self.add_new()
             if not new and self.offer_choice(['done adding?'], default=0):
                 print('Done Adding New Nodes!')
                 break
@@ -652,7 +661,7 @@ BASIC COMMANDS:
     /g  - draw graph
     /r  - recent nodes
     /n  - choose neighbor
-    /a  - add new node
+    /a  - add new node (fresh, not child)
     /e  - edit node
     /d  - delete node
     /m  - move node (add/remove connections)
@@ -690,7 +699,7 @@ INTERACTIVE PROCESSES:
                 elif new == '/g':
                     self.draw()
                 elif new == '/a':
-                    result = self.add_leaf()
+                    result = self.add_new()
                     if result:
                         old = result
                 elif new == '/e':
