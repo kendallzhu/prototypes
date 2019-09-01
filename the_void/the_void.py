@@ -125,27 +125,30 @@ class Void:
     def print_welcome(self):
         print(Style.BRIGHT + 'Welcome To The Void' + Style.RESET_ALL)
 
-    def print_current(self, node, **kwargs):
+    def print_green(self, node, **kwargs):
         print(Fore.GREEN + node + Style.RESET_ALL, **kwargs)
 
-    def print_prompt(self, node, **kwargs):
+    def print_bold(self, node, **kwargs):
         print(Style.BRIGHT + node + Style.RESET_ALL, **kwargs)
 
-    def print_default(self, text, **kwargs):
+    def print_purple(self, text, **kwargs):
         print(Fore.MAGENTA + text + Style.RESET_ALL, **kwargs)
 
     def print_with_neighbors(self, node):
-        print("\n(neighbors):")
+        self.print_bold("\nneighbors - [# connections]:")
         for neighbor in self.neighbors(node):
-            print(neighbor)
-        self.print_current(node)
+            s = neighbor + ' [' + str(self.degree(neighbor) - 1) + ']'
+            if self.degree(neighbor) == 1:
+                s += '*'
+            print(s)
+        self.print_green(node)
 
     # INTERACTIONS
     # get a string from user that can be used as node, abort => None
     def ask_node_name(self, prompt='', default=None):
-        self.print_prompt(prompt, end='')
+        self.print_bold(prompt, end='')
         if default:
-            self.print_default('(default - {})\n'.format(default), end='')
+            self.print_purple('(default - {})\n'.format(default), end='')
         name = input()
         if (not name) and default:
             print(default)
@@ -159,7 +162,7 @@ class Void:
     def ask_file_name(self, prompt='', default=''):
         print(prompt, end='')
         if default:
-            self.print_default('(default - {})\n'.format(default), end='')
+            self.print_purple('(default - {})\n'.format(default), end='')
         name = input()
         if (not name) and default:
             print(default)
@@ -182,7 +185,7 @@ class Void:
         if len(options) == 1:
             print('0) ' + options[0], end='')
             def_s = 'y' if default == 0 else 'n'
-            self.print_default(' (y/n, default {})\n'.format(def_s), end='')
+            self.print_purple(' (y/n, default {})\n'.format(def_s), end='')
             choice = input()
             if choice == 'y' or choice == '0' or choice == options[0]:
                 return options[0]
@@ -196,17 +199,16 @@ class Void:
                 return
             print('invalid choice, picking no')
             return
-        print('')
         for i, r in enumerate(options):
             print(str(i) + ') ' + r)
         # multiple options - numerical list
         if allow_rng:
-            self.print_default('(decimal => rng for option 0)')
+            self.print_purple('(decimal => rng for option 0)')
         if default:
             prompt = 'choose # or search (default - {}):'.format(default)
         else:
             prompt = 'choose # or search:'
-        self.print_prompt(prompt)
+        self.print_bold(prompt)
         choice = input()
         if choice.isdigit() and int(choice) < len(options):
             return options[int(choice)]
@@ -248,7 +250,7 @@ class Void:
         node = node.strip()
         results = [n for n in self.nodes() if node.lower() in n.lower()]
         if results:
-            print('search results:')
+            self.print_bold('Search Results:')
             choice = self.offer_choice(results, default=0)
             if choice:
                 self.reset_all_visits()
@@ -261,6 +263,7 @@ class Void:
         if not self.contains(node):
             return ''
         neighbors = self.neighbors(node)
+        self.print_bold('Choose Neighbor:')
         return self.offer_choice(neighbors)
 
     def choose_recent(self):
@@ -426,6 +429,7 @@ class Void:
     def load(self, snapshot=False):
         self.offer_save()
         directory = self.SNAPSHOT_DIR if snapshot else self.SAVE_DIR
+        self.print_bold('Load Session:')
         name = self.offer_choice(self.saved_sessions(directory))
         if name:
             self.__init__()
@@ -443,12 +447,12 @@ class Void:
     def add_leaf(self):
         new = self.ask_node_name('new node: ')
         if not new:
-            print('abort add new')
+            print('aborting add new')
             return
         query = input('Search for base connection: ')
         base = self.search(query)
         if not base:
-            print('abort add new')
+            print('aborting add new')
             return
         self.add(new, base)
         return new
@@ -473,13 +477,15 @@ class Void:
             if not self.is_valid_node_name(new_connection):
                 break
             self.add(new_connection, node)
-        print('Done Adding Connections!\n')
-        print('Remove Existing Connections?')
+        print('done adding connections!\n')
         while self.degree(node) > 1:
+            self.print_bold('Remove Existing Connection?')
             to_remove = self.offer_choice(self.neighbors(node))
             if not to_remove:
                 break
             self.remove_edge(node, to_remove)
+        if (self.degree(node) <= 1):
+            print('only one connection left, cannot remove')
         print('Done Moving!')
 
     def can_delete(self, node):
@@ -505,11 +511,10 @@ class Void:
 
     # replace current node and its neighbors with new node
     def condense(self, node):
-        print('\n')
         neighbors = self.neighbors(node)
         for n in neighbors:
             print(n)
-        self.print_current(node)
+        self.print_green(node)
         new = self.ask_node_name('[condense all ^ into]: \n')
         if not new:
             print('did not condense')
@@ -547,7 +552,7 @@ class Void:
         for n in reversed(self.nodes()):
             while True:
                 self.print_with_neighbors(n)
-                print('Actions:')
+                self.print_bold('\nActions:')
                 action = self.offer_choice([
                     'add children',
                     'edit',
@@ -634,8 +639,8 @@ class Void:
         old = ''
         while True:
             # spit message and take input
-            self.print_prompt('(? for options): ', end='')
-            self.print_current(old)
+            self.print_bold('(? for options): ', end='')
+            self.print_green(old)
             new = input().strip()
             # options info
             if new == '?':
@@ -714,6 +719,7 @@ GUIDED PROCESSES:
                     old = self.auto_traverse()
                 elif new == '/x':
                     self.delete_save()
+                    old = ''
                 elif new == '/ss':
                     self.snapshot()
                 elif new == '/ls':
