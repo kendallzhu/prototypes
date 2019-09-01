@@ -138,8 +138,6 @@ class Void:
         self.print_bold("\nneighbors - [# connections]:")
         for neighbor in self.neighbors(node):
             s = neighbor + ' [' + str(self.degree(neighbor) - 1) + ']'
-            if self.degree(neighbor) == 1:
-                s += '*'
             print(s)
         self.print_green(node)
 
@@ -267,7 +265,7 @@ class Void:
         return self.offer_choice(neighbors)
 
     def choose_recent(self):
-        print('Recently added:')
+        print('Recently Changed:')
         recents = self.get_recent(5)
         return self.offer_choice(recents)
 
@@ -647,18 +645,17 @@ class Void:
                 print('''
 BASIC COMMANDS:
     ?   - help (online docs one day?)
-    _   - create new node from here
+    _   - create new node as child
+    //_ - search for node
     RET - auto traverse (less visited neighbor)
     /b  - traverse back
-    //_ - search for node
-    /+_ - search + connect to node
-    /n  - neighbors
-    /r  - recent nodes
     /g  - draw graph
-    /a  - add node
+    /r  - recent nodes
+    /n  - choose neighbor
+    /a  - add new node
     /e  - edit node
     /d  - delete node
-    /m  - move node
+    /m  - move node (add/remove connections)
     /c  - condense node w/ neighbors
 
 SESSIONS + SNAPSHOTS:
@@ -671,7 +668,7 @@ SESSIONS + SNAPSHOTS:
     /ln - new session
     /q  - quit
 
-GUIDED PROCESSES:
+INTERACTIVE PROCESSES:
     /pick     - pick a node (tournament)
     /pick!    - pick a node (branch-from-current)
     /refactor - review + refactor entire graph
@@ -746,14 +743,7 @@ GUIDED PROCESSES:
                 elif new == '/debug':
                     self.debug_print()
                 else:
-                    if len(new) > 1 and new[1] == '+':
-                        # search with connection
-                        result = self.search(new[2:])
-                        if result:
-                            self.add(result, old)
-                            old = result
-                    elif len(new) > 1 and new[1] == '/':
-                        # normal search
+                    if len(new) > 1 and new[1] == '/':
                         result = self.search(new[2:])
                         if result:
                             old = result
