@@ -551,12 +551,14 @@ class Void:
         print('Step 1: Add New Nodes')
         while True:
             new = self.add_new()
-            if not new and self.offer_choice(['done adding?'], default=0):
+            if not new:
                 print('Done Adding New Nodes!')
                 break
         print('\nStep 2: Refactor Each Node\n')
         # go from least degree first, to give chances to move leaves
         for n in reversed(self.nodes()):
+            if not self.contains(n):
+                continue
             while True:
                 self.print_with_neighbors(n)
                 self.print_bold('\nActions:')
@@ -589,7 +591,7 @@ class Void:
                             break
                         self.add(child, n)
                 elif action == 'condense':
-                    self.condense(n)
+                    n = self.condense(n)
                 elif action == 'abort refactor':
                     print('Refactor aborted!')
                     return
