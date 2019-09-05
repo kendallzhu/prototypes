@@ -53,10 +53,13 @@ class Void:
     # insert a new node into the void from parent
     def add(self, node, parent=None):
         if type(node) != str:
-            print('Can only add strings as nodes!')
+            self.print_red('Can only add strings as nodes!')
             return
         if not self.is_valid_node_name(node):
-            print('Invalid node name')
+            self.print_red('Invalid node name')
+            return
+        if node in self.nodes():
+            self.print_red('Node name already in graph')
             return
         self.modified = True
         if not self.name:
@@ -73,11 +76,11 @@ class Void:
 
     def remove_edge(self, n1, n2):
         if self.degree(n1) == 1 or self.degree(n2) == 1:
-            print('removing edge would orphan node, aborting')
+            self.print_red('removing edge would orphan node, aborting')
             return
         self.graph.remove_edge(n1, n2)
         if not nx.has_path(self.graph, n1, n2):
-            print('removing edge would disconnect graph, aborting')
+            self.print_red('removing edge would disconnect graph, aborting')
             self.graph.add_edge(n1, n2)
             return
         self.modified = True
@@ -134,6 +137,9 @@ class Void:
     def print_purple(self, text, **kwargs):
         print(Fore.MAGENTA + text + Style.RESET_ALL, **kwargs)
 
+    def print_red(self, text, **kwargs):
+        print(Fore.RED + text + Style.RESET_ALL, **kwargs)
+
     def print_with_neighbors(self, node):
         self.print_bold("\nneighbors - [# connections]:")
         for neighbor in self.neighbors(node):
@@ -152,7 +158,7 @@ class Void:
             print(default)
             name = default
         if not self.is_valid_node_name(name):
-            print('invalid, aborting\n')
+            self.print_red('invalid, aborting\n')
             return None
         return name
 
@@ -166,7 +172,7 @@ class Void:
             print(default)
             name = default
         if not name or '/' in name or '.' in name or '\\' in name:
-            print('invalid file name, aborting\n')
+            self.print_red('invalid file name, aborting\n')
             return None
         return name
 
@@ -175,7 +181,7 @@ class Void:
         default = kwargs.get('default', None)
         allow_rng = kwargs.get('allow_rng', False)
         if not options:
-            print('no options to choose from')
+            self.print_red('no options to choose from')
             return
         if not (type(default) == int and default < len(options)):
             default = None
@@ -188,14 +194,14 @@ class Void:
             if choice == 'y' or choice == '0' or choice == options[0]:
                 return options[0]
             if choice == '' and default == 0:
-                print('defaulting - yes')
+                self.print_purple('defaulting - yes')
                 return options[0]
             if choice == 'n':
                 return
             if choice == '' and default != 0:
-                print('defaulting - no')
+                self.print_purple('defaulting - no')
                 return
-            print('invalid choice, picking no')
+            self.print_red('invalid choice, picking no')
             return
         for i, r in enumerate(options):
             print(str(i) + ') ' + r)
@@ -239,7 +245,7 @@ class Void:
                 print('*narrowed options by search*')
                 return self.offer_choice(searched, default=0)
             else:
-                print('invalid choice')
+                self.print_red('invalid choice')
                 return
 
     # NAVIGATION
@@ -255,7 +261,7 @@ class Void:
                 self.visit(choice)
             return choice
         else:
-            print('search: nothing found')
+            self.print_red('search: nothing found')
 
     def choose_neighbor(self, node):
         if not self.contains(node):
@@ -350,7 +356,7 @@ class Void:
             matplotlib.pyplot.margins(x=.12)
             matplotlib.pyplot.show()
         else:
-            print('nothing to draw yet')
+            self.print_red('nothing to draw yet')
 
     # SESSION SAVING - saved files have no extension
     def saved_sessions(self, directory):
@@ -417,7 +423,7 @@ class Void:
 
     def delete_snapshot(self):
         if self.name not in self.saved_sessions(self.SNAPSHOT_DIR):
-            print('snapshot aborted')
+            self.print_red('snapshot aborted')
             return
         if self.offer_choice(['delete this snapshot?'], default=0):
             os.remove(self.SNAPSHOT_DIR + self.name)
@@ -445,7 +451,7 @@ class Void:
     def add_new(self):
         new = self.ask_node_name('new node: ')
         if not new:
-            print('aborting add new')
+            self.print_red('aborting add new')
             return
         num_added = 0
         while True:
@@ -468,7 +474,7 @@ class Void:
     def edit(self, node):
         new = self.ask_node_name('edit node to: ', node)
         if new is None or (not new.strip()):
-            print('invalid')
+            self.print_red('invalid')
             return
         self.edit_node(node, new)
         return new
@@ -496,15 +502,26 @@ class Void:
         print('Done Moving!')
 
     def can_delete(self, node):
+        neighbors = self.neighbors(node)
+        disconnected = False
+        # remove node, check if disconnected, then put everything back
+        self.graph.remove_node(node)
+        for n1 in neighbors:
+            for n2 in neighbors:
+                if not nx.has_path(self.graph, n1, n2):
+                    disconnected = True
+        self.graph.add_node(node)
+        for n in neighbors:
+            self.graph.add_edge(node, n)
         for n in self.neighbors(node):
             if self.degree(n) == 1:
-                return False
-        return True
+                assert(disconnected)
+        return not disconnected
 
     # delete the current node - only works if 2 or less neighbors
     def delete_node(self, node):
         if not self.can_delete(node):
-            print('deleting would orphan a node (can try condense)')
+            self.print_red('deleting would disconnect graph (can try condense)')
             return
         neighbors = self.graph[node]
         self.graph.remove_node(node)
@@ -522,9 +539,9 @@ class Void:
         for n in neighbors:
             print(n)
         self.print_green(node)
-        new = self.ask_node_name('[condense all ^ into]: \n')
+        new = self.ask_node_name('[condense all ^ into]: ', default=node)
         if not new:
-            print('did not condense')
+            self.print_red('did not condense')
             return
         # collect all nodes 2 away
         neighbors = self.neighbors(node)
@@ -580,7 +597,7 @@ class Void:
                         self.remove_node_and_edges(n)
                         break
                     else:
-                        print('can\'t delete, try move instead?')
+                        self.print_red('can\'t delete, try move instead?')
                 elif action == 'move':
                     self.move(n)
                 elif action == 'add children':
@@ -593,7 +610,7 @@ class Void:
                 elif action == 'condense':
                     n = self.condense(n)
                 elif action == 'abort refactor':
-                    print('Refactor aborted!')
+                    self.print_red('Refactor aborted!')
                     return
         print('Done Refactoring!')
 
@@ -608,9 +625,10 @@ class Void:
             a, b = least_played.pop(), least_played.pop()
             choice = None
             while not choice:
+                print('')
                 choice = self.offer_choice([a, b], allow_rng=True)
                 if not choice and self.offer_choice(['quit pick?'], default=0):
-                    print('Aborted')
+                    self.print_red('Aborted')
                     return
             remaining.remove(a)
             remaining.remove(b)
@@ -632,7 +650,7 @@ class Void:
             while not choice:
                 choice = self.offer_choice(options, allow_rng=True)
                 if not choice and self.offer_choice(['quit picking?']):
-                    print('Aborted')
+                    self.print_red('Aborted')
                     return
             eliminated.update(options)
             next_batch = self.neighbors(choice) + [choice]
@@ -759,7 +777,7 @@ INTERACTIVE PROCESSES:
                         if result:
                             old = result
                     else:
-                        print('unrecognized command')
+                        self.print_red('unrecognized command')
                         if len(new) > 1 and \
                            self.offer_choice(['did you mean to search?']):
                             result = self.search(new[2:])
@@ -773,7 +791,7 @@ INTERACTIVE PROCESSES:
                 # automatically go to new thing when creating
                 old = new
             else:
-                print('invalid node name, try again\n')
+                self.print_red('invalid node name, try again\n')
 
 
 if __name__ == '__main__':
