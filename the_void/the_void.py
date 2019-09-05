@@ -463,7 +463,7 @@ class Void:
                     query = ''
             new_connection = self.search(query)
             if self.is_valid_node_name(new_connection):
-                self.add(new_connection, new)
+                self.add_edge(new, new_connection)
                 num_added += 1
             elif num_added > 0:
                 break
@@ -489,7 +489,7 @@ class Void:
             new_connection = self.search('' if query == '?' else query)
             if not self.is_valid_node_name(new_connection):
                 break
-            self.add(new_connection, node)
+            self.add_edge(node, new_connection)
         print('done adding connections!\n')
         while self.degree(node) > 1:
             self.print_bold('Remove Existing Connection?')
