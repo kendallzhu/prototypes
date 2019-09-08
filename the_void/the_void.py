@@ -60,7 +60,8 @@ class Void:
             return
         if node in self.nodes():
             self.print_red('Node name already in graph')
-            return
+            if not self.offer_choice(['connect to existing?'], default=0):
+                return
         self.modified = True
         if not self.name:
             self.name = node
@@ -69,6 +70,7 @@ class Void:
             self.set_time_created(node)
         if parent and parent not in self.neighbors(node):
             self.graph.add_edge(parent, node)
+        return node
 
     def add_edge(self, n1, n2):
         self.modified = True
@@ -440,6 +442,7 @@ class Void:
             self.graph = nx.read_gml(directory + name)
             self.name = name
             print('loaded!')
+            return name
 
     def new_session(self):
         self.offer_save()
@@ -480,25 +483,35 @@ class Void:
         return new
 
     # allow repicking the connections of a node
-    def move(self, node):
+    def add_connection(self, node):
         assert(node in self.nodes())
-        while True:
-            query = self.ask_node_name('New Connection (? - search any): ')
-            if not query:
-                break
-            new_connection = self.search('' if query == '?' else query)
-            if not self.is_valid_node_name(new_connection):
-                break
-            self.add_edge(node, new_connection)
-        print('done adding connections!\n')
-        while self.degree(node) > 1:
-            self.print_bold('Remove Existing Connection?')
-            to_remove = self.offer_choice(self.neighbors(node))
-            if not to_remove:
-                break
-            self.remove_edge(node, to_remove)
-        if (self.degree(node) <= 1):
-            print('only one connection left, cannot remove')
+        query = self.ask_node_name('Search New Connection: ')
+        if query != '' and (not self.is_valid_node_name(query)):
+            self.print_red('invalid query, aborting add connection')
+            return
+        new_connection = self.search(query)
+        if not new_connection:
+            self.print_red('no new connection made')
+            return
+        self.add_edge(node, new_connection)
+        return new_connection
+
+    def remove_connection(self, node):
+        assert(node in self.nodes())
+        removable_connections = self.neighbors(node)
+        if removable_connections == []:
+            self.print_red('no removable connections')
+            return
+        self.print_bold('Pick Connection to Remove: ')
+        to_remove = self.offer_choice(removable_connections)
+        if not to_remove:
+            self.print_red('no connection removed')
+            return
+        self.remove_edge(node, to_remove)
+
+    def move(self, node):
+        self.add_connection(node)
+        self.remove_connection(node)
         print('Done Moving!')
 
     def can_delete(self, node):
@@ -521,7 +534,7 @@ class Void:
     # delete the current node - only works if 2 or less neighbors
     def delete_node(self, node):
         if not self.can_delete(node):
-            self.print_red('deleting would disconnect graph (can try condense)')
+            self.print_red('deleting would disconnect graph (try condense?)')
             return
         neighbors = self.graph[node]
         self.graph.remove_node(node)
@@ -682,9 +695,11 @@ BASIC COMMANDS:
     /r  - recent nodes
     /n  - choose neighbor
     /a  - add new node (fresh, not child)
+    /+  - add connection
+    /-  - remove connection
     /e  - edit node
     /d  - delete node
-    /m  - move node (add/remove connections)
+    /m  - move node (add, then remove connection)
     /c  - condense node w/ neighbors
 
 SESSIONS + SNAPSHOTS:
@@ -722,6 +737,12 @@ INTERACTIVE PROCESSES:
                     result = self.add_new()
                     if result:
                         old = result
+                elif new == '/+':
+                    result = self.add_connection(old)
+                    if result:
+                        old = result
+                elif new == '/-':
+                    self.remove_connection(old)
                 elif new == '/e':
                     result = self.edit(old)
                     if result:
@@ -741,16 +762,16 @@ INTERACTIVE PROCESSES:
                 elif new == '/s':
                     self.save()
                 elif new == '/l':
-                    self.load()
-                    old = self.auto_traverse()
+                    if self.load():
+                        old = self.auto_traverse()
                 elif new == '/x':
                     self.delete_save()
                     old = ''
                 elif new == '/ss':
                     self.snapshot()
                 elif new == '/ls':
-                    self.load(True)
-                    old = self.auto_traverse()
+                    if self.load(True):
+                        old = self.auto_traverse()
                 elif new == '/xs':
                     self.delete_snapshot()
                 elif new == '/ln':
@@ -787,9 +808,9 @@ INTERACTIVE PROCESSES:
             elif type(new) == str and new.strip() == '':
                 old = self.auto_traverse(old)
             elif self.is_valid_node_name(new):
-                self.add(new, old)
-                # automatically go to new thing when creating
-                old = new
+                if self.add(new, old):
+                    # automatically go to new thing when creating
+                    old = new
             else:
                 self.print_red('invalid node name, try again\n')
 
