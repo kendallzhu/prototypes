@@ -498,7 +498,14 @@ class Void:
 
     def remove_connection(self, node):
         assert(node in self.nodes())
-        removable_connections = self.neighbors(node)
+        # find which nodes we can disconnect without breaking the graph
+        # (by removing and checking if path remains, then put it back)
+        removable_connections = []
+        for n in self.neighbors(node):
+            self.graph.remove_edge(node, n)
+            if nx.has_path(self.graph, node, n):
+                removable_connections.append(n)
+            self.add_edge(node, n)
         if removable_connections == []:
             self.print_red('no removable connections')
             return
