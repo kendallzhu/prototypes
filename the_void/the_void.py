@@ -37,8 +37,14 @@ class Void:
     def contains(self, node):
         return node in self.graph
 
+    # returns active nodes in graph
+    def nodes(self):
+        active_nodes = [n for n in self.graph if self.get_freeze(n) == 0]
+        return sorted(active_nodes, key=lambda n: -self.degree(n))
+
     def neighbors(self, node):
-        return sorted(list(self.graph[node]), key=lambda n: -self.degree(n))
+        active_neighbors = [n for n in self.nodes() if n in self.graph[node]]
+        return sorted(active_neighbors, key=lambda n: -self.degree(n))
 
     def degree(self, node):
         return len(self.graph[node])
@@ -46,9 +52,6 @@ class Void:
     def remove_node_and_edges(self, node):
         self.modified = True
         self.graph.remove_node(node)
-
-    def nodes(self):
-        return sorted(list(self.graph), key=lambda n: -self.degree(n))
 
     # insert a new node into the void from parent
     def add(self, node, parent=None):
@@ -122,6 +125,20 @@ class Void:
         nodes_by_time.reverse()
         num_return = min(number, len(nodes_by_time))
         return nodes_by_time[0:num_return]
+
+    def get_freeze(self, node):
+        return self.graph.nodes[node].get('freeze', 0)
+
+    # marks nodes other than current as +1 frozen level (inactive)
+    def freeze(self, node):
+        for n in self.graph.nodes:
+            if n != node:
+                self.graph.nodes[n]['freeze'] = self.get_freeze(n) + 1
+
+    def unfreeze(self):
+        for n in self.graph.nodes:
+            new_freeze = max(0, self.get_freeze(n) - 1)
+            self.graph.nodes[n]['freeze'] = new_freeze
 
     def debug_print(self):
         print(self.graph.nodes.data())
@@ -343,11 +360,18 @@ class Void:
             for node in [n for n in pretty_version.nodes()]:
                 text = format_node_text(node)
                 Void.edit_networkX_node(pretty_version, node, text)
+            color_map = []
+            for n in self.graph.nodes:
+                if self.get_freeze(n) == 0:
+                    color_map.append('#00a400')
+                else:
+                    gray_value = (0.5) ** self.get_freeze(n)
+                    color_map.append((gray_value,) * 3)
             nx.draw_kamada_kawai(
                 pretty_version,
                 with_labels=True,
                 font_weight='bold',
-                node_color='#00a400',
+                node_color=color_map,
                 # node_color='#ff6200'
             )
             mng = matplotlib.pyplot.get_current_fig_manager()
@@ -702,12 +726,14 @@ BASIC COMMANDS:
     /r  - recent nodes
     /n  - choose neighbor
     /a  - add new node (fresh, not child)
-    /+  - add connection
-    /-  - remove connection
     /e  - edit node
     /d  - delete node
-    /m  - move node (add, then remove connection)
     /c  - condense node w/ neighbors
+    /+  - add connection
+    /-  - remove connection
+    /m  - move node (add, then remove connection)
+    /f  - freeze all nodes +1
+    /u  - unfreeze all nodes -1
 
 SESSIONS + SNAPSHOTS:
     /s  - save session
@@ -766,6 +792,11 @@ INTERACTIVE PROCESSES:
                     result = self.condense(old)
                     if result:
                         old = result
+                elif new == '/f':
+                    self.freeze(old)
+                elif new == '/u':
+                    self.unfreeze()
+                # SESSION COMMANDS
                 elif new == '/s':
                     self.save()
                 elif new == '/l':
