@@ -51,7 +51,8 @@ class Void:
         return sorted(active_neighbors, key=lambda n: -self.degree(n))
 
     def frozen_neighbors(self, node):
-        frozen_neighbors = [n for n in self.frozen_nodes() if n in self.graph[node]]
+        frozen = self.frozen_nodes()
+        frozen_neighbors = [n for n in frozen if n in self.graph[node]]
         return sorted(frozen_neighbors, key=lambda n: -self.degree(n))
 
     def degree(self, node):
@@ -355,9 +356,11 @@ class Void:
         if self.is_empty() or not self.visit_history or \
            not self.contains(node):
             return ''
-        if node == self.visit_history[-1]:
-            self.visit_history.pop()
-        return self.visit_history.pop()
+        while self.visit_history:
+            prev = self.visit_history.pop()
+            if prev in self.nodes() and prev != node:
+                return prev
+        return node
 
     # VISUALIZATION
     # draw graph in new window
@@ -535,7 +538,7 @@ class Void:
     # allow repicking the connections of a node
     def add_connection(self, node):
         assert(node in self.nodes())
-        query = self.input('Search New Connection: ')
+        query = input('Search New Connection: ')
         if query != '' and (not self.is_valid_node_name(query)):
             self.print_red('invalid query, aborting add connection')
             return
@@ -618,7 +621,7 @@ class Void:
         frozen_neighbors = self.frozen_neighbors(node)
         two_away = []
         for n in neighbors:
-            for n2 in self.neighbors(n):
+            for n2 in self.neighbors(n) + self.frozen_neighbors(n):
                 if n2 != node and n2 not in neighbors:
                     two_away.append(n2)
         # remove node and all neighbors
