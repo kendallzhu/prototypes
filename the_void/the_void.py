@@ -42,9 +42,17 @@ class Void:
         active_nodes = [n for n in self.graph if self.get_freeze(n) == 0]
         return sorted(active_nodes, key=lambda n: -self.degree(n))
 
+    def frozen_nodes(self):
+        frozen_nodes = [n for n in self.graph if self.get_freeze(n) > 0]
+        return sorted(frozen_nodes, key=lambda n: -self.degree(n))
+
     def neighbors(self, node):
         active_neighbors = [n for n in self.nodes() if n in self.graph[node]]
         return sorted(active_neighbors, key=lambda n: -self.degree(n))
+
+    def frozen_neighbors(self, node):
+        frozen_neighbors = [n for n in self.frozen_nodes() if n in self.graph[node]]
+        return sorted(frozen_neighbors, key=lambda n: -self.degree(n))
 
     def degree(self, node):
         return len(self.graph[node])
@@ -129,14 +137,12 @@ class Void:
     def get_freeze(self, node):
         return self.graph.nodes[node].get('freeze', 0)
 
-    # marks nodes other than current as +1 frozen level (inactive)
     def freeze_all(self, node):
         for n in self.graph.nodes:
             if n != node:
                 self.graph.nodes[n]['freeze'] = self.get_freeze(n) + 1
         print('all nodes frozen once (except current)!')
 
-    # freeze single node
     def freeze_single(self, node):
         self.graph.nodes[node]['freeze'] = 1
         print('node frozen!')
@@ -146,6 +152,19 @@ class Void:
             new_freeze = max(0, self.get_freeze(n) - 1)
             self.graph.nodes[n]['freeze'] = new_freeze
         print('all nodes unfrozen once!')
+
+    def unfreeze_single(self):
+        query = input('Search Node to Unfreeze: ')
+        if query != '' and (not self.is_valid_node_name(query)):
+            self.print_red('invalid query, aborting unfreeze')
+            return
+        frozen_node = self.offer_choice(self.frozen_nodes())
+        if not frozen_node:
+            self.print_red('no node chosen')
+            return
+        self.graph.nodes[frozen_node]['freeze'] = 0
+        print('node unfrozen!')
+        return frozen_node
 
     def debug_print(self):
         print(self.graph.nodes.data())
@@ -516,7 +535,7 @@ class Void:
     # allow repicking the connections of a node
     def add_connection(self, node):
         assert(node in self.nodes())
-        query = self.ask_node_name('Search New Connection: ')
+        query = self.input('Search New Connection: ')
         if query != '' and (not self.is_valid_node_name(query)):
             self.print_red('invalid query, aborting add connection')
             return
@@ -596,6 +615,7 @@ class Void:
             return
         # collect all nodes 2 away
         neighbors = self.neighbors(node)
+        frozen_neighbors = self.frozen_neighbors(node)
         two_away = []
         for n in neighbors:
             for n2 in self.neighbors(n):
@@ -608,6 +628,9 @@ class Void:
         # add replacement with kept edges
         self.add(new)
         for n in two_away:
+            self.add_edge(new, n)
+        # add back frozen neighbors
+        for n in frozen_neighbors:
             self.add_edge(new, n)
         self.modified = True
         return new
@@ -753,8 +776,9 @@ SESSIONS + SNAPSHOTS:
     /q  - quit
 
 FREEZING/UNFREEZING (0 = active, >0 = frozen) 
-    /f  - freeze single active node (=1)
-    /ff - freeze all nodes (+1)
+    /f  - freeze this node (=1)
+    /u  - unfreeze single node (=0)
+    /ff - freeze all nodes once (+1)
     /uf  - unfreeze all nodes (-1)
 
 
@@ -808,6 +832,10 @@ INTERACTIVE PROCESSES:
                 elif new == '/f':
                     self.freeze_single(old)
                     old = self.auto_traverse()
+                elif new == '/u':
+                    result = self.unfreeze_single()
+                    if result:
+                        old = result
                 elif new == '/ff':
                     self.freeze_all(old)
                 elif new == '/uf':
