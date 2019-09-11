@@ -130,15 +130,22 @@ class Void:
         return self.graph.nodes[node].get('freeze', 0)
 
     # marks nodes other than current as +1 frozen level (inactive)
-    def freeze(self, node):
+    def freeze_all(self, node):
         for n in self.graph.nodes:
             if n != node:
                 self.graph.nodes[n]['freeze'] = self.get_freeze(n) + 1
+        print('all nodes frozen once (except current)!')
 
-    def unfreeze(self):
+    # freeze single node
+    def freeze_single(self, node):
+        self.graph.nodes[node]['freeze'] = 1
+        print('node frozen!')
+
+    def unfreeze_all(self):
         for n in self.graph.nodes:
             new_freeze = max(0, self.get_freeze(n) - 1)
             self.graph.nodes[n]['freeze'] = new_freeze
+        print('all nodes unfrozen once!')
 
     def debug_print(self):
         print(self.graph.nodes.data())
@@ -716,7 +723,7 @@ class Void:
             # options info
             if new == '?':
                 print('''
-BASIC COMMANDS:
+NAVIGATION:
     ?   - help (online docs one day?)
     _   - create new node as child
     //_ - search for node
@@ -725,6 +732,8 @@ BASIC COMMANDS:
     /g  - draw graph
     /r  - recent nodes
     /n  - choose neighbor
+
+BASIC OPERATIONS:
     /a  - add new node (fresh, not child)
     /e  - edit node
     /d  - delete node
@@ -732,8 +741,6 @@ BASIC COMMANDS:
     /+  - add connection
     /-  - remove connection
     /m  - move node (add, then remove connection)
-    /f  - freeze all nodes +1
-    /u  - unfreeze all nodes -1
 
 SESSIONS + SNAPSHOTS:
     /s  - save session
@@ -744,6 +751,12 @@ SESSIONS + SNAPSHOTS:
     /xs - delete snapshot
     /ln - new session
     /q  - quit
+
+FREEZING/UNFREEZING (0 = active, >0 = frozen) 
+    /f  - freeze single active node (=1)
+    /ff - freeze all nodes (+1)
+    /uf  - unfreeze all nodes (-1)
+
 
 INTERACTIVE PROCESSES:
     /pick     - pick a node (tournament)
@@ -793,9 +806,12 @@ INTERACTIVE PROCESSES:
                     if result:
                         old = result
                 elif new == '/f':
-                    self.freeze(old)
-                elif new == '/u':
-                    self.unfreeze()
+                    self.freeze_single(old)
+                    old = self.auto_traverse()
+                elif new == '/ff':
+                    self.freeze_all(old)
+                elif new == '/uf':
+                    self.unfreeze_all()
                 # SESSION COMMANDS
                 elif new == '/s':
                     self.save()
