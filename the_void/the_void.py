@@ -37,23 +37,24 @@ class Void:
     def contains(self, node):
         return node in self.graph
 
-    # returns active nodes in graph
     def nodes(self):
-        active_nodes = [n for n in self.graph if self.get_freeze(n) == 0]
-        return sorted(active_nodes, key=lambda n: -self.degree(n))
+        all_nodes = [n for n in self.graph]
+        return sorted(all_nodes, key=lambda n: -self.degree(n))
+
+    def active_nodes(self):
+        return [n for n in self.nodes() if self.get_freeze(n) == 0]
 
     def frozen_nodes(self):
-        frozen_nodes = [n for n in self.graph if self.get_freeze(n) > 0]
-        return sorted(frozen_nodes, key=lambda n: -self.degree(n))
+        return [n for n in self.nodes() if self.get_freeze(n) > 0]
 
     def neighbors(self, node):
-        active_neighbors = [n for n in self.nodes() if n in self.graph[node]]
-        return sorted(active_neighbors, key=lambda n: -self.degree(n))
+        return [n for n in self.nodes() if n in self.graph[node]]
+
+    def active_neighbors(self, node):
+        return [n for n in self.active_nodes() if n in self.graph[node]]
 
     def frozen_neighbors(self, node):
-        frozen = self.frozen_nodes()
-        frozen_neighbors = [n for n in frozen if n in self.graph[node]]
-        return sorted(frozen_neighbors, key=lambda n: -self.degree(n))
+        return [n for n in self.frozen_nodes() if n in self.graph[node]]
 
     def degree(self, node):
         return len(self.graph[node])
@@ -130,7 +131,7 @@ class Void:
         return name and name[0] != '/'
 
     def get_recent(self, number):
-        nodes_by_time = sorted(self.nodes(), key=self.get_time_created)
+        nodes_by_time = sorted(self.active_nodes(), key=self.get_time_created)
         nodes_by_time.reverse()
         num_return = min(number, len(nodes_by_time))
         return nodes_by_time[0:num_return]
@@ -188,7 +189,7 @@ class Void:
 
     def print_with_neighbors(self, node):
         self.print_bold("\nneighbors - [# connections]:")
-        for neighbor in self.neighbors(node):
+        for neighbor in self.active_neighbors(node):
             s = neighbor + ' [' + str(self.degree(neighbor) - 1) + ']'
             print(s)
         self.print_green(node)
@@ -298,7 +299,7 @@ class Void:
     # search for a node
     def search(self, node):
         node = node.strip()
-        results = [n for n in self.nodes() if node.lower() in n.lower()]
+        results = [n for n in self.active_nodes() if node.lower() in n.lower()]
         if results:
             self.print_bold('Search Results:')
             choice = self.offer_choice(results, default=0)
@@ -312,7 +313,7 @@ class Void:
     def choose_neighbor(self, node):
         if not self.contains(node):
             return ''
-        neighbors = self.neighbors(node)
+        neighbors = self.active_neighbors(node)
         self.print_bold('Choose Neighbor:')
         return self.offer_choice(neighbors)
 
@@ -332,7 +333,7 @@ class Void:
         self.weighted_visits = Counter()
 
     def primary_node(self):
-        options = self.nodes()
+        options = self.active_nodes()
         # largest degree, then shortest name
         options.sort(key=lambda n: (-self.degree(n), len(n)))
         return options[0]
@@ -341,11 +342,11 @@ class Void:
     def auto_traverse(self, node=None):
         if self.is_empty():
             return ''
-        if not self.contains(node) or not self.neighbors(node):
+        if not self.contains(node) or not self.active_neighbors(node):
             p = self.primary_node()
             self.visit(p)
             return p
-        options = self.neighbors(node)
+        options = self.active_neighbors(node)
         # choose by weighted_visits heuristic, then by less neighbors first
         options.sort(key=lambda n: (self.weighted_visits[n], self.degree(n)))
         choice = options[0]
@@ -359,7 +360,7 @@ class Void:
             return ''
         while self.visit_history:
             prev = self.visit_history.pop()
-            if prev in self.nodes() and prev != node:
+            if prev in self.active_nodes() and prev != node:
                 return prev
         return node
 
@@ -543,7 +544,7 @@ class Void:
 
     # allow repicking the connections of a node
     def add_connection(self, node):
-        assert(node in self.nodes())
+        assert(node in self.active_nodes())
         query = input('Search New Connection: ')
         if query != '' and (not self.is_valid_node_name(query)):
             self.print_red('invalid query, aborting add connection')
@@ -556,11 +557,11 @@ class Void:
         return new_connection
 
     def remove_connection(self, node):
-        assert(node in self.nodes())
+        assert(node in self.active_nodes())
         # find which nodes we can disconnect without breaking the graph
         # (by removing and checking if path remains, then put it back)
         removable_connections = []
-        for n in self.neighbors(node):
+        for n in self.active_neighbors(node):
             self.graph.remove_edge(node, n)
             if nx.has_path(self.graph, node, n):
                 removable_connections.append(n)
@@ -582,15 +583,11 @@ class Void:
 
     def can_delete(self, node):
         neighbors = self.neighbors(node)
-        neighbors += self.frozen_neighbors(node)
         disconnected = False
         # remove node, check if disconnected, then put everything back
         self.graph.remove_node(node)
         for n1 in neighbors:
             for n2 in neighbors:
-                print(n1)
-                print(n2)
-                print(nx.has_path(self.graph, n1, n2))
                 if not nx.has_path(self.graph, n1, n2):
                     disconnected = True
         self.graph.add_node(node)
@@ -618,7 +615,7 @@ class Void:
 
     # replace current node and its neighbors with new node
     def condense(self, node):
-        neighbors = self.neighbors(node)
+        neighbors = self.active_neighbors(node)
         for n in neighbors:
             print(n)
         self.print_green(node)
@@ -627,16 +624,18 @@ class Void:
             self.print_red('did not condense')
             return
         # collect all nodes 2 away
-        neighbors = self.neighbors(node)
+        active_neighbors = self.active_neighbors(node)
         frozen_neighbors = self.frozen_neighbors(node)
         two_away = []
-        for n in neighbors:
-            for n2 in self.neighbors(n) + self.frozen_neighbors(n):
-                if n2 != node and n2 not in neighbors:
+        # we are only condensing active neighbors, but must take into account
+        # second neighbors which are frozen, to establish connections
+        for n in active_neighbors:
+            for n2 in self.neighbors(n):
+                if n2 != node and n2 not in active_neighbors:
                     two_away.append(n2)
         # remove node and all neighbors
         self.graph.remove_node(node)
-        for n in neighbors:
+        for n in active_neighbors:
             self.graph.remove_node(n)
         # add replacement with kept edges
         self.add(new)
@@ -660,7 +659,7 @@ class Void:
                 break
         print('\nStep 2: Refactor Each Node\n')
         # go from least degree first, to give chances to move leaves
-        for n in reversed(self.nodes()):
+        for n in reversed(self.active_nodes()):
             if not self.contains(n):
                 continue
             while True:
@@ -704,7 +703,7 @@ class Void:
     # asks user to choose between random pairs until all but one are eliminated
     def pick_tournament(self):
         print('let\'s pick something! (tournament style)')
-        remaining = set(self.nodes())
+        remaining = set(self.active_nodes())
         least_played = set(remaining)
         while len(remaining) > 1:
             if len(least_played) <= 1:
