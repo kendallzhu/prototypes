@@ -366,7 +366,7 @@ class Void:
 
     # VISUALIZATION
     # draw graph in new window
-    def draw(self, include_frozen=True):
+    def draw(self, max_freeze=None):
         if self.graph:
             print('Drawing Graph... \n(Close window to resume)', flush=True)
 
@@ -388,9 +388,10 @@ class Void:
             def format_node_text(string):
                 return insert_newlines(string, 22)
             pretty_version = self.graph.copy()
-            if not include_frozen:
+            if max_freeze is not None:
                 for n in self.frozen_nodes():
-                    pretty_version.remove_node(n)
+                    if self.get_freeze(n) > max_freeze:
+                        pretty_version.remove_node(n)
             # color based on frozen
             color_map = []
             for n in pretty_version.nodes:
@@ -787,12 +788,12 @@ SESSIONS + SNAPSHOTS:
     /ln - new session
     /q  - quit
 
-FREEZING/UNFREEZING (0 = active, >0 = frozen) 
+FREEZING/UNFREEZING (0 = active, >0 = frozen)
     /f  - freeze this node (=1)
     /u  - unfreeze single node (=0)
     /ff - freeze all nodes once (+1)
     /uf - unfreeze all nodes (-1)
-    /ga - draw graph with only active nodes
+    /g# - draw graph w/ nodes freeze level <= #
 
 INTERACTIVE PROCESSES:
     /pick     - pick a node (tournament)
@@ -815,8 +816,12 @@ INTERACTIVE PROCESSES:
                         old = result
                 elif new == '/g':
                     self.draw()
-                elif new == '/ga':
-                    self.draw(False)
+                elif new[:2] == '/g':
+                    try:
+                        max_freeze = int(new[2:])
+                        self.draw(max_freeze)
+                    except ValueError:
+                        print('invalid parameter')
                 elif new == '/a':
                     result = self.add_new()
                     if result:
