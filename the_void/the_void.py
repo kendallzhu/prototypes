@@ -342,8 +342,9 @@ class Void:
         if self.is_empty():
             return ''
         if not self.contains(node) or not self.neighbors(node):
-            # TODO: should visit here or nah?
-            return self.primary_node()
+            p = self.primary_node()
+            self.visit(p)
+            return p
         options = self.neighbors(node)
         # choose by weighted_visits heuristic, then by less neighbors first
         options.sort(key=lambda n: (self.weighted_visits[n], self.degree(n)))
@@ -364,7 +365,7 @@ class Void:
 
     # VISUALIZATION
     # draw graph in new window
-    def draw(self):
+    def draw(self, include_frozen=True):
         if self.graph:
             print('Drawing Graph... \n(Close window to resume)', flush=True)
 
@@ -386,16 +387,21 @@ class Void:
             def format_node_text(string):
                 return insert_newlines(string, 22)
             pretty_version = self.graph.copy()
-            for node in [n for n in pretty_version.nodes()]:
-                text = format_node_text(node)
-                Void.edit_networkX_node(pretty_version, node, text)
+            if not include_frozen:
+                for n in self.frozen_nodes():
+                    pretty_version.remove_node(n)
+            # color based on frozen
             color_map = []
-            for n in self.graph.nodes:
+            for n in pretty_version.nodes:
                 if self.get_freeze(n) == 0:
                     color_map.append('#00a400')
                 else:
                     gray_value = (0.5) ** self.get_freeze(n)
                     color_map.append((gray_value,) * 3)
+            # format text
+            for node in [n for n in pretty_version.nodes()]:
+                text = format_node_text(node)
+                Void.edit_networkX_node(pretty_version, node, text)
             nx.draw_kamada_kawai(
                 pretty_version,
                 with_labels=True,
@@ -576,11 +582,15 @@ class Void:
 
     def can_delete(self, node):
         neighbors = self.neighbors(node)
+        neighbors += self.frozen_neighbors(node)
         disconnected = False
         # remove node, check if disconnected, then put everything back
         self.graph.remove_node(node)
         for n1 in neighbors:
             for n2 in neighbors:
+                print(n1)
+                print(n2)
+                print(nx.has_path(self.graph, n1, n2))
                 if not nx.has_path(self.graph, n1, n2):
                     disconnected = True
         self.graph.add_node(node)
@@ -782,8 +792,8 @@ FREEZING/UNFREEZING (0 = active, >0 = frozen)
     /f  - freeze this node (=1)
     /u  - unfreeze single node (=0)
     /ff - freeze all nodes once (+1)
-    /uf  - unfreeze all nodes (-1)
-
+    /uf - unfreeze all nodes (-1)
+    /ga - draw graph with only active nodes
 
 INTERACTIVE PROCESSES:
     /pick     - pick a node (tournament)
@@ -806,6 +816,8 @@ INTERACTIVE PROCESSES:
                         old = result
                 elif new == '/g':
                     self.draw()
+                elif new == '/ga':
+                    self.draw(False)
                 elif new == '/a':
                     result = self.add_new()
                     if result:
