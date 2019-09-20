@@ -723,10 +723,10 @@ class Void:
         return chosen
 
     # asks user to choose between neighbors from current node outward (faster)
-    def pick_path(self, start_node=None):
+    def pick_branching(self, start_node=None):
         if start_node is None:
             start_node = self.primary_node()
-        print('let\'s pick a path!')
+        print('let\'s pick something! (quick branching style)')
         eliminated = set([])
         options = self.neighbors(start_node) + [start_node]
         choice = None
@@ -753,8 +753,7 @@ class Void:
             # spit message and take input
             self.print_bold('(? for options): ', end='')
             self.print_green(old)
-            if self.contains(old):
-                self.visit(old)
+            self.visit(old)
             new = input().strip()
             # options info
             if new == '?':
@@ -796,8 +795,8 @@ FREEZING/UNFREEZING (0 = active, >0 = frozen)
     /g# - draw graph w/ nodes freeze level <= #
 
 INTERACTIVE PROCESSES:
-    /pick     - pick a node (tournament-style)
-    /path     - pick a path from current node
+    /pick     - pick a node (tournament)
+    /pick!    - pick a node (branch-from-current)
     /refactor - review + refactor entire graph
                 ''')
             # special commands start with /
@@ -885,8 +884,8 @@ INTERACTIVE PROCESSES:
                     chosen = self.pick_tournament()
                     if chosen:
                         old = chosen
-                elif new == '/path':
-                    chosen = self.pick_path(old)
+                elif new == '/pick!':
+                    chosen = self.pick_branching(old)
                     if chosen:
                         old = chosen
                 elif new == '/refactor':
