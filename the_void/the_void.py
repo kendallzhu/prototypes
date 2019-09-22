@@ -270,7 +270,7 @@ class Void:
             print(default)
             return options[default]
         # see if user input probability for first option
-        elif allow_rng:
+        elif allow_rng and choice:
             try:
                 probability = float(choice)
             except ValueError:
@@ -722,7 +722,7 @@ class Void:
         print('Chosen: ' + str(chosen))
         return chosen
 
-    # asks user to choose between neighbors from current node outward (faster)
+    # asks user to choose path from current node, eliminating as we go
     def pick_path(self, start_node=None):
         if start_node is None:
             start_node = self.primary_node()
@@ -731,12 +731,14 @@ class Void:
         options = self.neighbors(start_node) + [start_node]
         choice = None
         while len(options) > 1:
-            choice = None
-            while not choice:
-                choice = self.offer_choice(options, allow_rng=True)
-                if not choice and self.offer_choice(['quit picking?']):
+            new_choice = None
+            while not new_choice:
+                new_choice = self.offer_choice(options, allow_rng=True)
+                if not new_choice and \
+                   self.offer_choice(['quit picking?'], default=0):
                     self.print_red('Aborted')
-                    return
+                    return choice
+            choice = new_choice
             eliminated.update(options)
             next_batch = self.neighbors(choice) + [choice]
             options = [n for n in next_batch if n not in eliminated]
