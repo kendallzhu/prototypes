@@ -160,7 +160,9 @@ class Void:
         if query != '' and (not self.is_valid_node_name(query)):
             self.print_red('invalid query, aborting unfreeze')
             return
-        frozen_node = self.offer_choice(self.frozen_nodes())
+        options = self.frozen_nodes()
+        options = [n for n in options if n.lower() in query.lower()]
+        frozen_node = self.offer_choice(options)
         if not frozen_node:
             self.print_red('no node chosen')
             return
@@ -548,7 +550,10 @@ class Void:
         if query != '' and (not self.is_valid_node_name(query)):
             self.print_red('invalid query, aborting add connection')
             return
-        new_connection = self.search(query)
+        options = [n for n in self.nodes() if n != node]
+        options = [n for n in options if query.lower() in n.lower()]
+        options = [n for n in options if n not in self.neighbors(node)]
+        new_connection = self.offer_choice(options)
         if not new_connection:
             self.print_red('no new connection made')
             return
@@ -799,7 +804,7 @@ FREEZING/UNFREEZING (0 = active, >0 = frozen)
 
 INTERACTIVE PROCESSES:
     /pick     - pick a node (tournament-style)
-    /path     - pick a path from current node
+    /path     - path from current, eliminating everything seen
     /refactor - review + refactor entire graph
                 ''')
             # special commands start with /
