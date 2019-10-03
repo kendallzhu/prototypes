@@ -19,9 +19,9 @@ class Void:
         self.modified = False
         self.name = ''
         # nodes are strings
-        self.graph = nx.Graph()
+        self.graph = nx.DiGraph()
         # for traversal heuristic
-        self.weighted_visits = Counter()
+        self.num_visits = Counter()
         # for traversing back
         self.visit_history = []
         # for getting recent additions
@@ -37,34 +37,69 @@ class Void:
     def contains(self, node):
         return node in self.graph
 
+    def degree(self, node):
+        return self.graph.degree(node)
+
+    def in_degree(self, node):
+        return self.graph.in_degree(node)
+
+    def out_degree(self, node):
+        return self.graph.out_degree(node)
+
     def nodes(self):
         all_nodes = [n for n in self.graph]
-        return sorted(all_nodes, key=lambda n: -self.degree(n))
+        return sorted(all_nodes, key=lambda n: self.in_degree(n))
 
-    def active_nodes(self):
-        return [n for n in self.nodes() if self.get_freeze(n) == 0]
+    def children(self, node):
+        return [n for n in self.nodes()
+                if n in self.graph[node] and
+                node not in self.graph[n]]
 
-    def frozen_nodes(self):
-        return [n for n in self.nodes() if self.get_freeze(n) > 0]
+    def siblings(self, node):
+        return [n for n in self.nodes()
+                if n in self.graph[node] and
+                node in self.graph[n]]
+
+    def parents(self, node):
+        return [n for n in self.nodes()
+                if node in self.graph[n] and
+                n not in self.graph[node]]
 
     def neighbors(self, node):
-        return [n for n in self.nodes() if n in self.graph[node]]
+        return self.children(node) + self.siblings(node) + self.parents(node)
 
-    def active_neighbors(self, node):
-        return [n for n in self.active_nodes() if n in self.graph[node]]
+    def is_valid_node_name(self, name):
+        return name and name[0] != '/'
 
-    def frozen_neighbors(self, node):
-        return [n for n in self.frozen_nodes() if n in self.graph[node]]
-
-    def degree(self, node):
-        return len(self.graph[node])
-
-    def remove_node_and_edges(self, node):
+    def add_child(self, node, node_from=None):
         self.modified = True
-        self.graph.remove_node(node)
+        if not self.name:
+            self.name = node
+        if not self.contains(node):
+            self.graph.add_node(node)
+            self.set_time_created(node)
+        if node_from and node_from not in self.neighbors(node):
+            self.graph.add_edge(node_from, node)
+        return node
 
-    # insert a new node into the void from parent
-    def add(self, node, parent=None):
+    def add_sibling(self, node, node_from=None):
+        self.modified = True
+        if not self.name:
+            self.name = node
+        if not self.contains(node):
+            self.graph.add_node(node)
+            self.set_time_created(node)
+        if node_from and node_from not in self.siblings(node):
+            self.graph.add_edge(node_from, node)
+            self.graph.add_edge(node, node_from)
+            for s in self.siblings(node_from):
+                self.graph.add_edge(s, node)
+                self.graph.add_edge(node, s)
+            for p in self.parents(node_from):
+                self.graph.add_edge(p, node)
+        return node
+
+    def user_add_node(self, node, node_from=None):
         if type(node) != str:
             self.print_red('Can only add strings as nodes!')
             return
@@ -75,29 +110,29 @@ class Void:
             self.print_red('Node name already in graph')
             if not self.offer_choice(['connect to existing?'], default=0):
                 return
+        if node_from and self.offer_choice(['make child? (else sibling)']):
+            return self.add_child(node, node_from)
+        else:
+            return self.add_sibling(node, node_from)
+
+    def remove_node_and_edges(self, node):
         self.modified = True
-        if not self.name:
-            self.name = node
-        if not self.contains(node):
-            self.graph.add_node(node)
-            self.set_time_created(node)
-        if parent and parent not in self.neighbors(node):
-            self.graph.add_edge(parent, node)
-        return node
+        self.graph.remove_node(node)
 
     def add_edge(self, n1, n2):
         self.modified = True
         self.graph.add_edge(n1, n2)
 
+    def can_remove_edge(self, n1, n2):
+        test_graph = nx.Graph(self.graph.copy())
+        test_graph.remove_edge(n1, n2)
+        return nx.is_connected(test_graph)
+
     def remove_edge(self, n1, n2):
-        if self.degree(n1) == 1 or self.degree(n2) == 1:
-            self.print_red('removing edge would orphan node, aborting')
+        if not self.can_remove_edge(n1, n2):
+            self.print_red('removing edge would disconnect graph, aborting')
             return
         self.graph.remove_edge(n1, n2)
-        if not nx.has_path(self.graph, n1, n2):
-            self.print_red('removing edge would disconnect graph, aborting')
-            self.graph.add_edge(n1, n2)
-            return
         self.modified = True
 
     # functions for creation timestamps (to keep the constants in one place)
@@ -117,58 +152,26 @@ class Void:
     # not really a class function but I think clearer to put here
     @staticmethod
     def edit_networkX_node(graph, node, new):
-        neighbors = graph[node]
+        edges = [e for e in graph.edges() if node in e]
         graph.remove_node(node)
         graph.add_node(new)
-        for n in neighbors:
-            graph.add_edge(new, n)
+        for e in edges:
+            if e[0] == node:
+                graph.add_edge(new, e[1])
+            elif e[1] == node:
+                graph.add_edge(e[0], new)
+            else:
+                assert(False)
 
     def edit_node(self, node, new):
         self.modified = True
         Void.edit_networkX_node(self.graph, node, new)
 
-    def is_valid_node_name(self, name):
-        return name and name[0] != '/'
-
     def get_recent(self, number):
-        nodes_by_time = sorted(self.active_nodes(), key=self.get_time_created)
+        nodes_by_time = sorted(self.nodes(), key=self.get_time_created)
         nodes_by_time.reverse()
         num_return = min(number, len(nodes_by_time))
         return nodes_by_time[0:num_return]
-
-    def get_freeze(self, node):
-        return self.graph.nodes[node].get('freeze', 0)
-
-    def freeze_all(self, node):
-        for n in self.graph.nodes:
-            if n != node:
-                self.graph.nodes[n]['freeze'] = self.get_freeze(n) + 1
-        print('all nodes frozen once (except current)!')
-
-    def freeze_single(self, node):
-        self.graph.nodes[node]['freeze'] = 1
-        print('node frozen!')
-
-    def unfreeze_all(self):
-        for n in self.graph.nodes:
-            new_freeze = max(0, self.get_freeze(n) - 1)
-            self.graph.nodes[n]['freeze'] = new_freeze
-        print('all nodes unfrozen once!')
-
-    def unfreeze_single(self):
-        query = input('Search Node to Unfreeze: ')
-        if query != '' and (not self.is_valid_node_name(query)):
-            self.print_red('invalid query, aborting unfreeze')
-            return
-        options = self.frozen_nodes()
-        options = [n for n in options if n.lower() in query.lower()]
-        frozen_node = self.offer_choice(options)
-        if not frozen_node:
-            self.print_red('no node chosen')
-            return
-        self.graph.nodes[frozen_node]['freeze'] = 0
-        print('node unfrozen!')
-        return frozen_node
 
     def debug_print(self):
         print(self.graph.nodes.data())
@@ -189,11 +192,25 @@ class Void:
     def print_red(self, text, **kwargs):
         print(Fore.RED + text + Style.RESET_ALL, **kwargs)
 
-    def print_with_neighbors(self, node):
-        self.print_bold("\nneighbors - [# connections]:")
-        for neighbor in self.active_neighbors(node):
-            s = neighbor + ' [' + str(self.degree(neighbor) - 1) + ']'
+    def print_with_family(self, node):
+        self.print_bold("\nparents - [# children]:")
+        for n in self.parents(node):
+            s = n + ' [' + str(len(self.children(n))) + ']'
             print(s)
+        if self.parents(node) == []:
+            print("None")
+        self.print_bold("\nsiblings - [# children]:")
+        for n in self.siblings(node):
+            s = n + ' [' + str(len(self.children(n))) + ']'
+            print(s)
+        if self.siblings(node) == []:
+            print("None")
+        self.print_bold("\nchildren - [# children]:")
+        for n in self.children(node):
+            s = n + ' [' + str(len(self.children(n))) + ']'
+            print(s)
+        if self.children(node) == []:
+            print("None")
         self.print_green(node)
 
     # INTERACTIONS
@@ -301,7 +318,7 @@ class Void:
     # search for a node
     def search(self, node):
         node = node.strip()
-        results = [n for n in self.active_nodes() if node.lower() in n.lower()]
+        results = [n for n in self.nodes() if node.lower() in n.lower()]
         if results:
             self.print_bold('Search Results:')
             choice = self.offer_choice(results, default=0)
@@ -312,13 +329,6 @@ class Void:
         else:
             self.print_red('search: nothing found')
 
-    def choose_neighbor(self, node):
-        if not self.contains(node):
-            return ''
-        neighbors = self.active_neighbors(node)
-        self.print_bold('Choose Neighbor:')
-        return self.offer_choice(neighbors)
-
     def choose_recent(self):
         print('Recently Changed:')
         recents = self.get_recent(5)
@@ -326,47 +336,46 @@ class Void:
 
     def visit(self, node):
         assert(self.contains(node))
-        # weighted_visits increases as a node is repeatedly visited
-        if self.degree(node) > 0:
-            self.weighted_visits[node] += 1 / self.degree(node)
+        self.num_visits[node] += 1
         self.visit_history.append(node)
 
     def reset_all_visits(self):
-        self.weighted_visits = Counter()
+        self.num_visits = Counter()
 
     def primary_node(self):
-        options = self.active_nodes()
-        # largest degree, then shortest name
-        options.sort(key=lambda n: (-self.degree(n), len(n)))
+        options = self.nodes()
+        # least children, then shortest name
+        options.sort(key=lambda n: (self.out_degree(n), len(n)))
         return options[0]
 
-    # return neighbor based on least visited (weighted)
     def auto_traverse(self, node=None):
         if self.is_empty():
             return ''
-        if not self.contains(node) or not self.active_neighbors(node):
-            p = self.primary_node()            
+        if not self.contains(node) or not self.neighbors(node):
+            p = self.primary_node()
             return p
-        options = self.active_neighbors(node)
-        # choose by weighted_visits heuristic, then by less neighbors first
-        options.sort(key=lambda n: (self.weighted_visits[n], self.degree(n)))
-        choice = options[0]        
+        options = []
+        # choose less visits, prioritizing siblings then children then parents
+        options += sorted(
+            self.neighbors(node),
+            key=lambda n:
+            (self.num_visits[n], n in self.parents(n), n in self.children(n)))
+        choice = options[0]
         return choice
 
-    # to nodes with more neighbors and more visited (likely where we came from)
     def traverse_back(self, node):
         if self.is_empty() or not self.visit_history or \
            not self.contains(node):
             return ''
         while self.visit_history:
             prev = self.visit_history.pop()
-            if prev in self.active_nodes() and prev != node:
+            if prev in self.nodes() and prev != node:
                 return prev
         return node
 
     # VISUALIZATION
     # draw graph in new window
-    def draw(self, max_freeze=None):
+    def draw(self):
         if self.graph:
             print('Drawing Graph... \n(Close window to resume)', flush=True)
 
@@ -388,18 +397,11 @@ class Void:
             def format_node_text(string):
                 return insert_newlines(string, 22)
             pretty_version = self.graph.copy()
-            if max_freeze is not None:
-                for n in self.frozen_nodes():
-                    if self.get_freeze(n) > max_freeze:
-                        pretty_version.remove_node(n)
-            # color based on frozen
+            # color todo
             color_map = []
             for n in pretty_version.nodes:
-                if self.get_freeze(n) == 0:
-                    color_map.append('#00a400')
-                else:
-                    gray_value = (0.5) ** self.get_freeze(n)
-                    color_map.append((gray_value,) * 3)
+                color_map.append('#00a400')
+
             # format text
             for node in [n for n in pretty_version.nodes()]:
                 text = format_node_text(node)
@@ -408,8 +410,7 @@ class Void:
                 pretty_version,
                 with_labels=True,
                 font_weight='bold',
-                node_color=color_map,
-                # node_color='#ff6200'
+                node_color=color_map
             )
             mng = matplotlib.pyplot.get_current_fig_manager()
             # mng.window.state('zoomed')
@@ -511,31 +512,7 @@ class Void:
         self.print_welcome()
 
     # ADVANCED FEATURES
-    # add completely new node and connect as many others to it as desired
-    def add_new(self):
-        new = self.ask_node_name('new node: ')
-        if not new:
-            self.print_red('aborting add new')
-            return
-        num_added = 0
-        while True:
-            query = self.ask_node_name('Find New Connection:')
-            if not query:
-                if num_added > 0:
-                    break
-                else:
-                    query = ''
-            new_connection = self.search(query)
-            if self.is_valid_node_name(new_connection):
-                self.add_edge(new, new_connection)
-                num_added += 1
-            elif num_added > 0:
-                break
-        print('done adding connections!\n')
-        return new
-
-    # relabel the current node
-    def edit(self, node):
+    def user_edit(self, node):
         new = self.ask_node_name('edit node to: ', node)
         if new is None or (not new.strip()):
             self.print_red('invalid')
@@ -544,8 +521,8 @@ class Void:
         return new
 
     # allow repicking the connections of a node
-    def add_connection(self, node):
-        assert(node in self.active_nodes())
+    def user_add_connection(self, node):
+        assert(node in self.nodes())
         query = input('Search New Connection: ')
         if query != '' and (not self.is_valid_node_name(query)):
             self.print_red('invalid query, aborting add connection')
@@ -557,50 +534,50 @@ class Void:
         if not new_connection:
             self.print_red('no new connection made')
             return
-        self.add_edge(node, new_connection)
-        return new_connection
+        self.print_bold('Choose Connection Type:')
+        connection_type = self.offer_choice(['sibling', 'child', 'parent'])
+        if connection_type == 'sibling':
+            self.add_sibling(node, new_connection)
+        elif connection_type == 'child':
+            self.add_child(node, new_connection)
+        elif connection_type == 'parent':
+            self.add_parent(new_connection, node)
+        else:
+            self.print_red('invalid choice, no new connection made')
+            return
+        return node
 
-    def remove_connection(self, node):
-        assert(node in self.active_nodes())
+    def user_remove_connection(self, node):
+        assert(node in self.nodes())
         # find which nodes we can disconnect without breaking the graph
         # (by removing and checking if path remains, then put it back)
-        removable_connections = []
-        for n in self.active_neighbors(node):
-            self.graph.remove_edge(node, n)
-            if nx.has_path(self.graph, node, n):
-                removable_connections.append(n)
-            self.add_edge(node, n)
-        if removable_connections == []:
+        removable = [n for n in self.neighbors(node)
+                     if self.can_remove_edge(node, n)]
+        if removable == []:
             self.print_red('no removable connections')
             return
         self.print_bold('Pick Connection to Remove: ')
-        to_remove = self.offer_choice(removable_connections)
+        to_remove = self.offer_choice(removable)
         if not to_remove:
             self.print_red('no connection removed')
             return
-        self.remove_edge(node, to_remove)
+        if to_remove in self.children(node):
+            self.remove_edge(node, to_remove)
+        if to_remove in self.siblings(node):
+            self.remove_edge(node, to_remove)
+            self.remove_edge(to_remove, node)
+        if to_remove in self.parents(node):
+            self.remove_edge(to_remove, node)
 
-    def move(self, node):
-        self.add_connection(node)
-        self.remove_connection(node)
+    def user_move(self, node):
+        self.user_add_connection(node)
+        self.user_remove_connection(node)
         print('Done Moving!')
 
     def can_delete(self, node):
-        neighbors = self.neighbors(node)
-        disconnected = False
-        # remove node, check if disconnected, then put everything back
-        self.graph.remove_node(node)
-        for n1 in neighbors:
-            for n2 in neighbors:
-                if not nx.has_path(self.graph, n1, n2):
-                    disconnected = True
-        self.graph.add_node(node)
-        for n in neighbors:
-            self.graph.add_edge(node, n)
-        for n in self.neighbors(node):
-            if self.degree(n) == 1:
-                assert(disconnected)
-        return not disconnected
+        test_graph = nx.Graph(self.graph.copy())
+        test_graph.remove_node(node)
+        return nx.is_connected(test_graph)
 
     # delete the current node - only works if 2 or less neighbors
     def delete_node(self, node):
@@ -609,105 +586,14 @@ class Void:
             return
         neighbors = self.graph[node]
         self.graph.remove_node(node)
-        for n1 in neighbors:
-            for n2 in neighbors:
-                if n1 != n2:
-                    self.graph.add_edge(n1, n2)
         print('deleted!')
         self.modified = True
         return list(neighbors)[0] if neighbors else None
 
-    # replace current node and its neighbors with new node
-    def condense(self, node):
-        neighbors = self.active_neighbors(node)
-        for n in neighbors:
-            print(n)
-        self.print_green(node)
-        new = self.ask_node_name('[condense all ^ into]: ', default=node)
-        if not new:
-            self.print_red('did not condense')
-            return
-        # collect all nodes 2 away
-        active_neighbors = self.active_neighbors(node)
-        frozen_neighbors = self.frozen_neighbors(node)
-        two_away = []
-        # we are only condensing active neighbors, but must take into account
-        # second neighbors which are frozen, to establish connections
-        for n in active_neighbors:
-            for n2 in self.neighbors(n):
-                if n2 != node and n2 not in active_neighbors:
-                    two_away.append(n2)
-        # remove node and all neighbors
-        self.graph.remove_node(node)
-        for n in active_neighbors:
-            self.graph.remove_node(n)
-        # add replacement with kept edges
-        self.add(new)
-        for n in two_away:
-            self.add_edge(new, n)
-        # add back frozen neighbors
-        for n in frozen_neighbors:
-            self.add_edge(new, n)
-        self.modified = True
-        return new
-
-    # offer comprehensive review + refactor of graph
-    def refactor(self):
-        self.offer_snapshot()
-        print('\nRefactor!\n')
-        print('Step 1: Add New Nodes')
-        while True:
-            new = self.add_new()
-            if not new:
-                print('Done Adding New Nodes!')
-                break
-        print('\nStep 2: Refactor Each Node\n')
-        # go from least degree first, to give chances to move leaves
-        for n in reversed(self.active_nodes()):
-            if not self.contains(n):
-                continue
-            while True:
-                self.print_with_neighbors(n)
-                self.print_bold('\nActions:')
-                action = self.offer_choice([
-                    'add children',
-                    'edit',
-                    'delete',
-                    'move',
-                    'condense',
-                    'abort refactor'
-                ])
-                if action is None:
-                    print('Done with Node!')
-                    break
-                elif action == 'edit':
-                    n = self.edit(n)
-                elif action == 'delete':
-                    if self.can_delete(n):
-                        self.remove_node_and_edges(n)
-                        break
-                    else:
-                        self.print_red('can\'t delete, try move instead?')
-                elif action == 'move':
-                    self.move(n)
-                elif action == 'add children':
-                    while True:
-                        child = self.ask_node_name('new child?: ')
-                        if not child:
-                            print('Done adding children!')
-                            break
-                        self.add(child, n)
-                elif action == 'condense':
-                    n = self.condense(n)
-                elif action == 'abort refactor':
-                    self.print_red('Refactor aborted!')
-                    return
-        print('Done Refactoring!')
-
     # asks user to choose between random pairs until all but one are eliminated
     def pick_tournament(self):
         print('let\'s pick something! (tournament style)')
-        remaining = set(self.active_nodes())
+        remaining = set(self.nodes())
         least_played = set(remaining)
         while len(remaining) > 1:
             if len(least_played) <= 1:
@@ -733,7 +619,7 @@ class Void:
             start_node = self.primary_node()
         print('let\'s pick a path!')
         eliminated = set([])
-        options = self.neighbors(start_node) + [start_node]
+        options = self.children(start_node) + [start_node]
         choice = None
         while len(options) > 1:
             new_choice = None
@@ -745,7 +631,7 @@ class Void:
                     return choice
             choice = new_choice
             eliminated.update(options)
-            next_batch = self.neighbors(choice) + [choice]
+            next_batch = self.children(choice) + [choice]
             options = [n for n in next_batch if n not in eliminated]
         print('Chosen: ' + str(choice))
         return choice
@@ -768,19 +654,17 @@ class Void:
                 print('''
 NAVIGATION:
     ?   - help (online docs one day?)
-    _   - create new node as child
+    _   - create new node
     //_ - search for node
-    RET - auto traverse (less visited neighbor)
+    RET - auto traverse
     /b  - traverse back
     /g  - draw graph
     /r  - recent nodes
-    /n  - choose neighbor
+    /n  - print neighbors
 
 BASIC OPERATIONS:
-    /a  - add new node (fresh, not child)
     /e  - edit node
     /d  - delete node
-    /c  - condense node w/ neighbors
     /+  - add connection
     /-  - remove connection
     /m  - move node (add, then remove connection)
@@ -795,17 +679,9 @@ SESSIONS + SNAPSHOTS:
     /ln - new session
     /q  - quit
 
-FREEZING/UNFREEZING (0 = active, >0 = frozen)
-    /f  - freeze this node (=1)
-    /u  - unfreeze single node (=0)
-    /ff - freeze all nodes once (+1)
-    /uf - unfreeze all nodes (-1)
-    /g# - draw graph w/ nodes freeze level <= #
-
 INTERACTIVE PROCESSES:
     /pick     - pick a node (tournament-style)
     /path     - path from current, eliminating everything seen
-    /refactor - review + refactor entire graph
                 ''')
             # special commands start with /
             elif new and new[0] == '/':
@@ -814,58 +690,31 @@ INTERACTIVE PROCESSES:
                     if result:
                         old = result
                 elif new == '/n' and old:
-                    result = self.choose_neighbor(old)
-                    if result:
-                        old = result
+                    self.print_with_family(old)
                 elif new == '/r' and old:
                     result = self.choose_recent()
                     if result:
                         old = result
                 elif new == '/g':
                     self.draw()
-                elif new[:2] == '/g':
-                    try:
-                        max_freeze = int(new[2:])
-                        self.draw(max_freeze)
-                    except ValueError:
-                        print('invalid parameter')
-                elif new == '/a':
-                    result = self.add_new()
-                    if result:
-                        old = result
-                elif new == '/+':
-                    result = self.add_connection(old)
-                    if result:
-                        old = result
-                elif new == '/-':
-                    self.remove_connection(old)
                 elif new == '/e':
-                    result = self.edit(old)
+                    result = self.user_edit(old)
                     if result:
                         old = result
                 elif new == '/d' and old:
                     result = self.delete_node(old)
                     if result:
                         old = result
+                elif new == '/+':
+                    result = self.user_add_connection(old)
+                    if result:
+                        old = result
+                elif new == '/-':
+                    self.user_remove_connection(old)
                 elif new == '/m':
-                    result = self.move(old)
+                    result = self.user_move(old)
                     if result:
                         old = result
-                elif new == '/c' and old:
-                    result = self.condense(old)
-                    if result:
-                        old = result
-                elif new == '/f':
-                    self.freeze_single(old)
-                    old = self.auto_traverse()
-                elif new == '/u':
-                    result = self.unfreeze_single()
-                    if result:
-                        old = result
-                elif new == '/ff':
-                    self.freeze_all(old)
-                elif new == '/uf':
-                    self.unfreeze_all()
                 # SESSION COMMANDS
                 elif new == '/s':
                     self.save()
@@ -896,8 +745,6 @@ INTERACTIVE PROCESSES:
                     chosen = self.pick_path(old)
                     if chosen:
                         old = chosen
-                elif new == '/refactor':
-                    self.refactor()
                 elif new == '/debug':
                     self.debug_print()
                 else:
@@ -916,7 +763,7 @@ INTERACTIVE PROCESSES:
             elif type(new) == str and new.strip() == '':
                 old = self.auto_traverse(old)
             elif self.is_valid_node_name(new):
-                if self.add(new, old):
+                if self.user_add_node(new, old):
                     # automatically go to new thing when creating
                     old = new
             else:
