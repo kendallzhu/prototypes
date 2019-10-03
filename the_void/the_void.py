@@ -90,13 +90,13 @@ class Void:
             self.graph.add_node(node)
             self.set_time_created(node)
         if node_from and node_from not in self.siblings(node):
-            self.graph.add_edge(node_from, node)
-            self.graph.add_edge(node, node_from)
             for s in self.siblings(node_from):
                 self.graph.add_edge(s, node)
                 self.graph.add_edge(node, s)
             for p in self.parents(node_from):
                 self.graph.add_edge(p, node)
+            self.graph.add_edge(node_from, node)
+            self.graph.add_edge(node, node_from)                
         return node
 
     def user_add_node(self, node, node_from=None):
@@ -157,6 +157,7 @@ class Void:
         graph.add_node(new)
         for e in edges:
             if e[0] == node:
+                assert(node[1] != node)
                 graph.add_edge(new, e[1])
             elif e[1] == node:
                 graph.add_edge(e[0], new)
@@ -399,7 +400,7 @@ class Void:
             pretty_version = self.graph.copy()
             # color todo
             color_map = []
-            for n in pretty_version.nodes:
+            for n in pretty_version.nodes():
                 color_map.append('#00a400')
 
             # format text
@@ -502,6 +503,7 @@ class Void:
         if name:
             self.__init__()
             self.graph = nx.read_gml(directory + name)
+            self.graph = nx.to_directed(self.graph)
             self.name = name
             print('loaded!')
             return name
