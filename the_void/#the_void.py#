@@ -769,6 +769,7 @@ INTERACTIVE PROCESSES:
             elif new and new[0] == '>':
                 child = new[1:]
                 if self.add_node(child, old, True):
+                    print("added as child!")
                     old = child
             elif self.is_valid_node_name(new):
                 if self.add_node(new, old):
