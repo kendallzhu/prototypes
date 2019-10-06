@@ -544,7 +544,7 @@ class Void:
         elif connection_type == 'child':
             self.add_child(node, new_connection)
         elif connection_type == 'parent':
-            self.add_parent(new_connection, node)
+            self.add_child(new_connection, node)
         else:
             self.print_red('invalid choice, no new connection made')
             return
@@ -585,9 +585,9 @@ class Void:
     # delete the current node - only works if 2 or less neighbors
     def delete_node(self, node):
         if not self.can_delete(node):
-            self.print_red('deleting would disconnect graph (try condense?)')
+            self.print_red('deleting would disconnect graph - see children')
             return
-        neighbors = self.graph[node]
+        neighbors = self.neighbors(node)
         self.graph.remove_node(node)
         print('deleted!')
         self.modified = True
@@ -658,8 +658,8 @@ class Void:
 NAVIGATION:
     ?   - help (online docs one day?)
     _   - create new node as sibling
-    >_ - create new node as child
-    /?_ - search for node
+    >_  - create new node as child
+    //_ - search for node
     RET - auto traverse
     /b  - traverse back
     /g  - draw graph
@@ -752,7 +752,7 @@ INTERACTIVE PROCESSES:
                 elif new == '/debug':
                     self.debug_print()
                 else:
-                    if len(new) > 1 and new[1] == '?':
+                    if len(new) > 1 and new[1] == '/':
                         result = self.search(new[2:])
                         if result:
                             old = result
@@ -769,6 +769,7 @@ INTERACTIVE PROCESSES:
             elif new and new[0] == '>':
                 child = new[1:]
                 if self.add_node(child, old, True):
+                    self.print_purple("added as child!")
                     old = child
             elif self.is_valid_node_name(new):
                 if self.add_node(new, old):
