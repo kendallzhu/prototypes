@@ -593,10 +593,16 @@ class Void:
         self.modified = True
         return list(neighbors)[0] if neighbors else None
 
+    def user_pick(self):
+        self.user_pick_tournament(self.nodes())
+
+    def user_pick_child(self, node):
+        self.user_pick_tournament(self.children(node))
+
     # asks user to choose between random pairs until all but one are eliminated
-    def pick_tournament(self):
+    def user_pick_tournament(self, nodes):
         print('let\'s pick something! (tournament style)')
-        remaining = set(self.nodes())
+        remaining = set(nodes)
         least_played = set(remaining)
         while len(remaining) > 1:
             if len(least_played) <= 1:
@@ -664,7 +670,9 @@ NAVIGATION:
     /b  - traverse back
     /g  - draw graph
     /r  - recent nodes
-    /n  - print neighbors
+    /n  - show neighbors
+    /p  - pick any a node (tournament-style)
+    /ps - pick any child (tournament-style)
 
 BASIC OPERATIONS:
     /e  - edit node
@@ -682,10 +690,6 @@ SESSIONS + SNAPSHOTS:
     /xs - delete snapshot
     /ln - new session
     /q  - quit
-
-INTERACTIVE PROCESSES:
-    /pick     - pick a node (tournament-style)
-    /path     - path from current, eliminating everything seen
                 ''')
             # special commands start with /
             elif new and new[0] == '/':
@@ -741,14 +745,14 @@ INTERACTIVE PROCESSES:
                 elif new == '/q':
                     self.offer_save()
                     return
-                elif new == '/pick':
-                    chosen = self.pick_tournament()
+                elif new == '/p':
+                    chosen = self.user_pick()
                     if chosen:
                         old = chosen
-                elif new == '/path':
-                    chosen = self.pick_path(old)
+                elif new == '/ps':
+                    chosen = self.user_pick_child(old)
                     if chosen:
-                        old = chosen
+                        old = chosen                
                 elif new == '/debug':
                     self.debug_print()
                 else:
