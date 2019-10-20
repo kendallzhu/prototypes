@@ -48,6 +48,7 @@ class Void:
 
     def nodes(self):
         all_nodes = [n for n in self.graph]
+        # put node with fewest parents first (source of the graph)
         return sorted(all_nodes, key=lambda n: self.in_degree(n))
 
     def children(self, node):
@@ -157,7 +158,7 @@ class Void:
         graph.add_node(new)
         for e in edges:
             if e[0] == node:
-                assert(node[1] != node)
+                assert(e[1] != node)
                 graph.add_edge(new, e[1])
             elif e[1] == node:
                 graph.add_edge(e[0], new)
@@ -343,11 +344,8 @@ class Void:
     def reset_all_visits(self):
         self.num_visits = Counter()
 
-    def primary_node(self):
-        options = self.nodes()
-        # least children, then shortest name
-        options.sort(key=lambda n: (self.out_degree(n), len(n)))
-        return options[0]
+    def primary_node(self):        
+        return self.nodes()[0]
 
     def auto_traverse(self, node=None):
         if self.is_empty():
@@ -455,6 +453,10 @@ class Void:
         nx.write_gml(self.graph, self.SAVE_DIR + self.name)
         self.modified = False
         print('saved!')
+
+    def force_save(self):
+        nx.write_gml(self.graph, self.SAVE_DIR + 'force_save')
+        self.print_red('force-saved!')
 
     # write to file with timestamp into snapshots folder
     def snapshot(self):
@@ -593,10 +595,16 @@ class Void:
         self.modified = True
         return list(neighbors)[0] if neighbors else None
 
+    def user_pick(self):
+        return self.user_pick_tournament(self.nodes())
+
+    def user_pick_child(self, node):
+        return self.user_pick_tournament(self.children(node))
+
     # asks user to choose between random pairs until all but one are eliminated
-    def pick_tournament(self):
+    def user_pick_tournament(self, nodes):
         print('let\'s pick something! (tournament style)')
-        remaining = set(self.nodes())
+        remaining = set(nodes)
         least_played = set(remaining)
         while len(remaining) > 1:
             if len(least_played) <= 1:
@@ -615,29 +623,6 @@ class Void:
         chosen = remaining.pop()
         print('Chosen: ' + str(chosen))
         return chosen
-
-    # asks user to choose path from current node, eliminating as we go
-    def pick_path(self, start_node=None):
-        if start_node is None:
-            start_node = self.primary_node()
-        print('let\'s pick a path!')
-        eliminated = set([])
-        options = self.children(start_node) + [start_node]
-        choice = None
-        while len(options) > 1:
-            new_choice = None
-            while not new_choice:
-                new_choice = self.offer_choice(options, allow_rng=True)
-                if not new_choice and \
-                   self.offer_choice(['quit picking?'], default=0):
-                    self.print_red('Aborted')
-                    return choice
-            choice = new_choice
-            eliminated.update(options)
-            next_batch = self.children(choice) + [choice]
-            options = [n for n in next_batch if n not in eliminated]
-        print('Chosen: ' + str(choice))
-        return choice
 
     def __str__(self):
         return self.recap()
@@ -664,7 +649,9 @@ NAVIGATION:
     /b  - traverse back
     /g  - draw graph
     /r  - recent nodes
-    /n  - print neighbors
+    /n  - show neighbors
+    /p  - pick any a node (tournament-style)
+    /pc - pick any child (tournament-style)
 
 BASIC OPERATIONS:
     /e  - edit node
@@ -682,10 +669,6 @@ SESSIONS + SNAPSHOTS:
     /xs - delete snapshot
     /ln - new session
     /q  - quit
-
-INTERACTIVE PROCESSES:
-    /pick     - pick a node (tournament-style)
-    /path     - path from current, eliminating everything seen
                 ''')
             # special commands start with /
             elif new and new[0] == '/':
@@ -741,12 +724,12 @@ INTERACTIVE PROCESSES:
                 elif new == '/q':
                     self.offer_save()
                     return
-                elif new == '/pick':
-                    chosen = self.pick_tournament()
+                elif new == '/p':
+                    chosen = self.user_pick()
                     if chosen:
                         old = chosen
-                elif new == '/path':
-                    chosen = self.pick_path(old)
+                elif new == '/pc':
+                    chosen = self.user_pick_child(old)
                     if chosen:
                         old = chosen
                 elif new == '/debug':
@@ -767,22 +750,24 @@ INTERACTIVE PROCESSES:
             elif type(new) == str and new.strip() == '':
                 old = self.auto_traverse(old)
             elif new and new[0] == '>':
+                assert(False)
                 child = new[1:]
                 if self.add_node(child, old, True):
                     self.print_purple("added as child!")
                     old = child
             elif self.is_valid_node_name(new):
                 if self.add_node(new, old):
-                    # automatically go to new thing when creating
+                    self.print_purple("added as sibling!")
                     old = new
             else:
                 self.print_red('invalid node name, try again\n')
 
 
 if __name__ == '__main__':
+    # initiate session
+    void = Void()
     try:
-        # initiate session
-        void = Void()
         void.loop()
     except Exception:
+        void.force_save()
         print(traceback.format_exc())
