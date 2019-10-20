@@ -750,7 +750,6 @@ SESSIONS + SNAPSHOTS:
             elif type(new) == str and new.strip() == '':
                 old = self.auto_traverse(old)
             elif new and new[0] == '>':
-                assert(False)
                 child = new[1:]
                 if self.add_node(child, old, True):
                     self.print_purple("added as child!")
