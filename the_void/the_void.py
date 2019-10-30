@@ -49,20 +49,20 @@ class Void:
     def nodes(self):
         all_nodes = [n for n in self.graph]
         # put node with fewest parents first (source of the graph)
-        return sorted(all_nodes, key=lambda n: self.in_degree(n))
+        return sorted(all_nodes, key=lambda n: len(self.parents(n)))
 
     def children(self, node):
-        return [n for n in self.nodes()
+        return [n for n in self.graph
                 if n in self.graph[node] and
                 node not in self.graph[n]]
 
     def siblings(self, node):
-        return [n for n in self.nodes()
+        return [n for n in self.graph
                 if n in self.graph[node] and
                 node in self.graph[n]]
 
     def parents(self, node):
-        return [n for n in self.nodes()
+        return [n for n in self.graph
                 if node in self.graph[n] and
                 n not in self.graph[node]]
 
