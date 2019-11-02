@@ -610,13 +610,16 @@ class Void:
         return self.user_pick_tournament(self.nodes())
 
     def user_pick_child(self, node):
+        if not self.children(node):
+            self.print_red('No Children to Pick From, Aborting')
+            return
         return self.user_pick_tournament(self.children(node))
 
     def user_pick_sibling(self, node):
-        return self.user_pick_tournament(self.siblings(node))
+        return self.user_pick_tournament(self.siblings(node) + [node])
 
     # asks user to choose between random pairs until all but one are eliminated
-    def user_pick_tournament(self, nodes):
+    def user_pick_tournament(self, nodes):        
         print('let\'s pick something! (tournament style)')
         remaining = set(nodes)
         least_played = set(remaining)
