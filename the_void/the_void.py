@@ -251,8 +251,9 @@ class Void:
         if not options:
             self.print_red('no options to choose from')
             return
-        if not (type(default) == int and default < len(options)):
-            self.print_red('BUG - invalid default given to offer_choice');
+        if default is not None and \
+           not (type(default) == int and default < len(options)):
+            self.print_red('BUG - invalid default given to offer_choice')
             default = None
         # special y/n query for single option, always default
         if len(options) == 1:
@@ -277,8 +278,9 @@ class Void:
         # multiple options - numerical list
         if allow_rng:
             self.print_purple('(decimal => rng for option 0)')
-        if default:
-            prompt = 'choose # or search (default - {}):'.format(default)
+        if default is not None:
+            prompt = 'choose # or search (default - {}):'.format(
+                options[default])
         else:
             prompt = 'choose # or search:'
         self.print_bold(prompt)
@@ -288,8 +290,8 @@ class Void:
         # choosing via typing the exact contents
         elif choice in options:
             return choice
-        elif not choice and default:
-            print(default)
+        elif not choice and default is not None:
+            print(options[default])
             return options[default]
         # see if user input probability for first option
         elif allow_rng and choice:
@@ -526,7 +528,7 @@ class Void:
         self.edit_node(node, new)
         return new
 
-    # allow repicking the connections of a node
+    # allow repicking the connections of a node, return all new connections
     def user_add_connection(self, node):
         assert(node in self.nodes())
         query = input('Search New Connection: ')
@@ -536,29 +538,30 @@ class Void:
         options = [n for n in self.nodes() if n != node]
         options = [n for n in options if query.lower() in n.lower()]
         options = [n for n in options if n not in self.neighbors(node)]
-        new_connection = self.offer_choice(options)
+        new_connection = self.offer_choice(options, default=0)
         if not new_connection:
             self.print_red('no new connection made')
             return
         self.print_bold('Choose Connection Type:')
-        connection_type = self.offer_choice(['sibling', 'child', 'parent'])
+        connection_type = self.offer_choice(
+            ['sibling', 'child', 'parent'], default=0)
         if connection_type == 'sibling':
-            self.add_sibling(node, new_connection)
+            self.add_sibling(node, new_connection)            
+            return self.siblings(new_connection) + [new_connection]
         elif connection_type == 'child':
             self.add_child(node, new_connection)
+            return new_connection
         elif connection_type == 'parent':
             self.add_child(new_connection, node)
-        else:
-            self.print_red('invalid choice, no new connection made')
-            return
-        return node
+            return new_connection
+        self.print_red('invalid choice, no new connection made')
 
-    def user_remove_connection(self, node):
+    def user_remove_connection(self, node, exclude=[]):
         assert(node in self.nodes())
         # find which nodes we can disconnect without breaking the graph
         # (by removing and checking if path remains, then put it back)
         removable = [n for n in self.neighbors(node)
-                     if self.can_remove_edge(node, n)]
+                     if self.can_remove_edge(node, n) and n not in exclude]
         if removable == []:
             self.print_red('no removable connections')
             return
@@ -583,8 +586,8 @@ class Void:
                 self.remove_edge(r, node)
 
     def user_move(self, node):
-        self.user_add_connection(node)
-        self.user_remove_connection(node)
+        new_connections = self.user_add_connection(node)
+        self.user_remove_connection(node, new_connections)
         print('Done Moving!')
 
     def can_delete(self, node):
@@ -705,9 +708,8 @@ SESSIONS + SNAPSHOTS:
                     if result:
                         old = result
                 elif new == '/+':
-                    result = self.user_add_connection(old)
-                    if result:
-                        old = result
+                    self.user_add_connection(old)
+                    # more intuitive to stay on same node?
                 elif new == '/-':
                     self.user_remove_connection(old)
                 elif new == '/m':
