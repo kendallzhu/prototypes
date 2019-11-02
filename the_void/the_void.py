@@ -601,6 +601,9 @@ class Void:
     def user_pick_child(self, node):
         return self.user_pick_tournament(self.children(node))
 
+    def user_pick_sibling(self, node):
+        return self.user_pick_tournament(self.siblings(node))
+
     # asks user to choose between random pairs until all but one are eliminated
     def user_pick_tournament(self, nodes):
         print('let\'s pick something! (tournament style)')
@@ -651,7 +654,8 @@ NAVIGATION:
     /r  - recent nodes
     /n  - show neighbors
     /p  - pick any a node (tournament-style)
-    /pc - pick any child (tournament-style)
+    /pc - pick a child (tournament-style)
+    /ps - pick a sibling (tournament-style)
 
 BASIC OPERATIONS:
     /e  - edit node
@@ -730,6 +734,10 @@ SESSIONS + SNAPSHOTS:
                         old = chosen
                 elif new == '/pc':
                     chosen = self.user_pick_child(old)
+                    if chosen:
+                        old = chosen
+                elif new == '/ps':
+                    chosen = self.user_pick_sibling(old)
                     if chosen:
                         old = chosen
                 elif new == '/debug':
