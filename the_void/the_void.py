@@ -252,6 +252,7 @@ class Void:
             self.print_red('no options to choose from')
             return
         if not (type(default) == int and default < len(options)):
+            self.print_red('BUG - invalid default given to offer_choice');
             default = None
         # special y/n query for single option, always default
         if len(options) == 1:
@@ -562,17 +563,24 @@ class Void:
             self.print_red('no removable connections')
             return
         self.print_bold('Pick Connection to Remove: ')
-        to_remove = self.offer_choice(removable)
-        if not to_remove:
+        all_string = 'Remove All Connections'
+        choice = self.offer_choice([all_string] + removable, default=0)
+        if not choice:
             self.print_red('no connection removed')
             return
-        if to_remove in self.children(node):
-            self.remove_edge(node, to_remove)
-        if to_remove in self.siblings(node):
-            self.remove_edge(node, to_remove)
-            self.remove_edge(to_remove, node)
-        if to_remove in self.parents(node):
-            self.remove_edge(to_remove, node)
+        to_remove = []
+        if choice == all_string:
+            to_remove = removable
+        else:
+            to_remove = [choice]
+        for r in to_remove:
+            if r in self.children(node):
+                self.remove_edge(node, r)
+            if r in self.siblings(node):
+                self.remove_edge(node, r)
+                self.remove_edge(r, node)
+            if r in self.parents(node):
+                self.remove_edge(r, node)
 
     def user_move(self, node):
         self.user_add_connection(node)
