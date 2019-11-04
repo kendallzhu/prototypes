@@ -123,7 +123,6 @@ class Void:
             if not self.offer_choice(['connect to existing?'], default=0):
                 return
         if node_from and relationship == 'child':
-            assert(not is_parent)
             return self.add_child(node, node_from)
         elif node_from and relationship == 'parent':
             return self.add_parent(node, node_from)
