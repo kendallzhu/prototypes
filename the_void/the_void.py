@@ -72,6 +72,17 @@ class Void:
     def is_valid_node_name(self, name):
         return name and name[0] != '/'
 
+    def add_parent(self, node, node_from=None):
+        self.modified = True
+        if not self.name:
+            self.name = node
+        if not self.contains(node):
+            self.graph.add_node(node)
+            self.set_time_created(node)
+        if node_from and node_from not in self.neighbors(node):
+            self.graph.add_edge(node, node_from)
+        return node
+    
     def add_child(self, node, node_from=None):
         self.modified = True
         if not self.name:
@@ -100,7 +111,7 @@ class Void:
             self.graph.add_edge(node, node_from)
         return node
 
-    def add_node(self, node, node_from=None, is_child=False):
+    def add_node(self, node, node_from=None, relationship='sibling'):
         if type(node) != str:
             self.print_red('Can only add strings as nodes!')
             return
@@ -111,9 +122,13 @@ class Void:
             self.print_red('Node name already in graph')
             if not self.offer_choice(['connect to existing?'], default=0):
                 return
-        if node_from and is_child:
+        if node_from and relationship == 'child':
+            assert(not is_parent)
             return self.add_child(node, node_from)
+        elif node_from and relationship == 'parent':
+            return self.add_parent(node, node_from)
         else:
+            assert(relationship == 'sibling')
             return self.add_sibling(node, node_from)
 
     def remove_node_and_edges(self, node):
@@ -772,9 +787,14 @@ SESSIONS + SNAPSHOTS:
                 old = self.auto_traverse(old)
             elif new and new[0] == '>':
                 child = new[1:]
-                if self.add_node(child, old, True):
+                if self.add_node(child, old, "child"):
                     self.print_purple("added as child!")
                     old = child
+            elif new and new[0] == '<':
+                parent = new[1:]
+                if self.add_node(parent, old, "parent"):
+                    self.print_purple("added as parent!")
+                    old = parent
             elif self.is_valid_node_name(new):
                 if self.add_node(new, old):
                     self.print_purple("added as sibling!")
