@@ -422,8 +422,19 @@ class Void:
             for node in [n for n in pretty_version.nodes()]:
                 text = format_node_text(node)
                 Void.edit_networkX_node(pretty_version, node, text)
-            nx.draw_kamada_kawai(
+                
+            distances = dict()
+            for n in pretty_version.nodes():
+                distances[n] = dict()
+                for n2 in pretty_version.nodes():
+                    if n != n2:
+                        undirected = nx.Graph(pretty_version)
+                        d = nx.shortest_path_length(undirected, n, n2)
+                        distances[n][n2] = 2 + d
+            pos = nx.kamada_kawai_layout(pretty_version, dist = distances)
+            nx.draw(
                 pretty_version,
+                pos,
                 with_labels=True,
                 font_weight='bold',
                 node_color=color_map,
@@ -472,8 +483,9 @@ class Void:
         print('saved!')
 
     def force_save(self):
-        nx.write_gml(self.graph, self.SAVE_DIR + 'force_save')
-        self.print_red('force-saved!')
+        if self.modified:
+            nx.write_gml(self.graph, self.SAVE_DIR + 'force_save')
+            self.print_red('force-saved!')
 
     # write to file with timestamp into snapshots folder
     def snapshot(self):
