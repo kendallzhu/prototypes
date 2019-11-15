@@ -82,7 +82,7 @@ class Void:
         if node_from and node_from not in self.neighbors(node):
             self.graph.add_edge(node, node_from)
         return node
-    
+
     def add_child(self, node, node_from=None):
         self.modified = True
         if not self.name:
@@ -122,6 +122,8 @@ class Void:
             self.print_red('Node name already in graph')
             if not self.offer_choice(['connect to existing?'], default=0):
                 return
+        # reset navigation counters when adding a new node
+        self.reset_all_visits()
         if node_from and relationship == 'child':
             return self.add_child(node, node_from)
         elif node_from and relationship == 'parent':
@@ -191,6 +193,7 @@ class Void:
 
     def debug_print(self):
         print(self.graph.nodes.data())
+        print(self.num_visits)
 
     # DISPLAY + STYLES
     def print_welcome(self):
@@ -476,6 +479,11 @@ class Void:
     # write to file in main session folder
     def save(self):
         new_name = self.rename()
+        while (self.name in self.saved_sessions(self.SAVE_DIR)):
+            if self.offer_choice(['overwrite existing save of same name?']):
+                break
+            else:
+                new_name = self.rename()
         if not new_name:
             return
         nx.write_gml(self.graph, self.SAVE_DIR + self.name)
