@@ -425,7 +425,7 @@ class Void:
             for node in [n for n in pretty_version.nodes()]:
                 text = format_node_text(node)
                 Void.edit_networkX_node(pretty_version, node, text)
-                
+
             distances = dict()
             for n in pretty_version.nodes():
                 distances[n] = dict()
@@ -490,10 +490,10 @@ class Void:
         self.modified = False
         print('saved!')
 
-    def force_save(self):
+    def auto_save(self):
         if self.modified:
-            nx.write_gml(self.graph, self.SAVE_DIR + 'force_save')
-            self.print_red('force-saved!')
+            nx.write_gml(self.graph, self.SAVE_DIR + 'auto_save')
+            self.print_red('auto-saved!')
 
     # write to file with timestamp into snapshots folder
     def snapshot(self):
@@ -625,6 +625,8 @@ class Void:
         print('Done Moving!')
 
     def can_delete(self, node):
+        if len(self.nodes()) <= 1:
+            return False
         test_graph = nx.Graph(self.graph.copy())
         test_graph.remove_node(node)
         return nx.is_connected(test_graph)
@@ -632,7 +634,7 @@ class Void:
     # delete the current node - only works if 2 or less neighbors
     def delete_node(self, node):
         if not self.can_delete(node):
-            self.print_red('deleting would disconnect graph - see children')
+            self.print_red('deleting would disconnect graph')
             return
         neighbors = self.neighbors(node)
         self.graph.remove_node(node)
@@ -828,5 +830,5 @@ if __name__ == '__main__':
     try:
         void.loop()
     except Exception:
-        void.force_save()
+        void.auto_save()
         print(traceback.format_exc())
