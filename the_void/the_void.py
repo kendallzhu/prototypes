@@ -22,6 +22,8 @@ class Void:
         self.graph = nx.DiGraph()
         # for traversal heuristic
         self.num_visits = Counter()
+        # for displaying structure
+        self.indentation = 0
         # for traversing back
         self.visit_history = []
         # for getting recent additions
@@ -363,8 +365,9 @@ class Void:
 
     def reset_all_visits(self):
         self.num_visits = Counter()
+        self.indentation = 0
 
-    def primary_node(self):        
+    def primary_node(self):
         return self.nodes()[0]
 
     def auto_traverse(self, node=None):
@@ -387,6 +390,12 @@ class Void:
             key=lambda n:
             (self.num_visits[n], n in self.children(node), n in self.parents(node)))
         choice = options[0]
+        # change display indentation based on child/parent traversals
+        if choice in self.children(node):
+            self.indentation += 1
+        elif choice in self.parents(node):
+            self.indentation -= 1
+        self.indentation = max(self.indentation, 0)
         return choice
 
     def traverse_back(self, node):
@@ -693,6 +702,8 @@ class Void:
         while True:
             # spit message and take input
             self.print_bold('(? for options): ', end='')
+            # print indentation
+            print('>' * self.indentation, end=' ')
             self.print_green(old)
             if self.contains(old):
                 self.visit(old)
