@@ -374,11 +374,18 @@ class Void:
             p = self.primary_node()
             return p
         options = []
-        # choose less visits, prioritizing siblings then children then parents
+        # for unvisited, prioritize siblings then children then parents
+        unvisited = [n for n in self.neighbors(node) if self.num_visits[n] < 1]
         options += sorted(
-            self.neighbors(node),
+            unvisited,
             key=lambda n:
-            (self.num_visits[n], n in self.parents(n), n in self.children(n)))
+            (n in self.parents(node), n in self.children(node)))
+        # prioritize less visited, siblings then parents then children
+        visited = [n for n in self.neighbors(node) if self.num_visits[n] > 0]
+        options += sorted(
+            visited,
+            key=lambda n:
+            (self.num_visits[n], n in self.children(node), n in self.parents(node)))
         choice = options[0]
         return choice
 
@@ -492,7 +499,7 @@ class Void:
 
     def auto_save(self):
         if self.modified:
-            nx.write_gml(self.graph, self.SAVE_DIR + 'auto_save')
+            nx.write_gml(self.graph, self.SAVE_DIR + '_auto_save')
             self.print_red('auto-saved!')
 
     # write to file with timestamp into snapshots folder
