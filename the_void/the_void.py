@@ -390,12 +390,7 @@ class Void:
             key=lambda n:
             (self.num_visits[n], n in self.children(node), n in self.parents(node)))
         choice = options[0]
-        # change display indentation based on child/parent traversals
-        if choice in self.children(node):
-            self.indentation += 1
-        elif choice in self.parents(node):
-            self.indentation -= 1
-        self.indentation = max(self.indentation, 0)
+        self.update_indentation(node, choice)
         return choice
 
     def traverse_back(self, node):
@@ -405,8 +400,17 @@ class Void:
         while self.visit_history:
             prev = self.visit_history.pop()
             if prev in self.nodes() and prev != node:
+                self.update_indentation(node, prev)
                 return prev
         return node
+
+    def update_indentation(self, old, new):
+        # change display indentation based on child/parent traversals
+        if new in self.children(old):
+            self.indentation += 1
+        elif new in self.parents(old):
+            self.indentation -= 1
+        self.indentation = max(self.indentation, 0)
 
     # VISUALIZATION
     # draw graph in new window
