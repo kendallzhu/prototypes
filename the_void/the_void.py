@@ -498,12 +498,14 @@ class Void:
 
     # write to file in main session folder
     def save(self):
+        old_name = self.name
         new_name = self.rename()
-        while (self.name in self.saved_sessions(self.SAVE_DIR)):
-            if self.offer_choice(['overwrite existing save of same name?']):
-                break
-            else:
-                new_name = self.rename()
+        if new_name != old_name:
+            while self.name in self.saved_sessions(self.SAVE_DIR):
+                if self.offer_choice(['overwrite existing save?'], default=0):
+                    break
+                else:
+                    new_name = self.rename()
         if not new_name:
             return
         nx.write_gml(self.graph, self.SAVE_DIR + self.name)
@@ -748,10 +750,12 @@ SESSIONS + SNAPSHOTS:
                 ''')
             # special commands start with /
             elif new and new[0] == '/':
-                if new == '/b':
-                    result = self.traverse_back(old)
-                    if result:
-                        old = result
+                if new in ['/b' * i for i in range(1, 4)]:
+                    # hack to allow multiple backs in one line
+                    for i in range(len(new) // 2):
+                        result = self.traverse_back(old)
+                        if result:
+                            old = result
                 elif new == '/n' and old:
                     self.print_with_family(old)
                 elif new == '/r' and old:
