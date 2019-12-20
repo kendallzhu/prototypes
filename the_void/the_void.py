@@ -22,6 +22,8 @@ class Void:
         self.graph = nx.DiGraph()
         # for traversal heuristic
         self.num_visits = Counter()
+        # for displaying structure
+        self.indentation = 0
         # for traversing back
         self.visit_history = []
         # for getting recent additions
@@ -82,7 +84,7 @@ class Void:
         if node_from and node_from not in self.neighbors(node):
             self.graph.add_edge(node, node_from)
         return node
-    
+
     def add_child(self, node, node_from=None):
         self.modified = True
         if not self.name:
@@ -122,6 +124,8 @@ class Void:
             self.print_red('Node name already in graph')
             if not self.offer_choice(['connect to existing?'], default=0):
                 return
+        # reset navigation counters when adding a new node
+        self.reset_all_visits()
         if node_from and relationship == 'child':
             return self.add_child(node, node_from)
         elif node_from and relationship == 'parent':
@@ -191,6 +195,7 @@ class Void:
 
     def debug_print(self):
         print(self.graph.nodes.data())
+        print(self.num_visits)
 
     # DISPLAY + STYLES
     def print_welcome(self):
@@ -360,8 +365,9 @@ class Void:
 
     def reset_all_visits(self):
         self.num_visits = Counter()
+        self.indentation = 0
 
-    def primary_node(self):        
+    def primary_node(self):
         return self.nodes()[0]
 
     def auto_traverse(self, node=None):
@@ -371,12 +377,20 @@ class Void:
             p = self.primary_node()
             return p
         options = []
-        # choose less visits, prioritizing siblings then children then parents
+        # for unvisited, prioritize siblings then children then parents
+        unvisited = [n for n in self.neighbors(node) if self.num_visits[n] < 1]
         options += sorted(
-            self.neighbors(node),
+            unvisited,
             key=lambda n:
-            (self.num_visits[n], n in self.parents(n), n in self.children(n)))
+            (n in self.parents(node), n in self.children(node)))
+        # prioritize less visited, siblings then parents then children
+        visited = [n for n in self.neighbors(node) if self.num_visits[n] > 0]
+        options += sorted(
+            visited,
+            key=lambda n:
+            (self.num_visits[n], n in self.children(node), n in self.parents(node)))
         choice = options[0]
+        self.update_indentation(node, choice)
         return choice
 
     def traverse_back(self, node):
@@ -386,8 +400,17 @@ class Void:
         while self.visit_history:
             prev = self.visit_history.pop()
             if prev in self.nodes() and prev != node:
+                self.update_indentation(node, prev)
                 return prev
         return node
+
+    def update_indentation(self, old, new):
+        # change display indentation based on child/parent traversals
+        if new in self.children(old):
+            self.indentation += 1
+        elif new in self.parents(old):
+            self.indentation -= 1
+        self.indentation = max(self.indentation, 0)
 
     # VISUALIZATION
     # draw graph in new window
@@ -422,8 +445,19 @@ class Void:
             for node in [n for n in pretty_version.nodes()]:
                 text = format_node_text(node)
                 Void.edit_networkX_node(pretty_version, node, text)
-            nx.draw_kamada_kawai(
+
+            distances = dict()
+            for n in pretty_version.nodes():
+                distances[n] = dict()
+                for n2 in pretty_version.nodes():
+                    if n != n2:
+                        undirected = nx.Graph(pretty_version)
+                        d = nx.shortest_path_length(undirected, n, n2)
+                        distances[n][n2] = 2 + d
+            pos = nx.kamada_kawai_layout(pretty_version, dist = distances)
+            nx.draw(
                 pretty_version,
+                pos,
                 with_labels=True,
                 font_weight='bold',
                 node_color=color_map,
@@ -464,16 +498,24 @@ class Void:
 
     # write to file in main session folder
     def save(self):
+        old_name = self.name
         new_name = self.rename()
+        if new_name != old_name:
+            while self.name in self.saved_sessions(self.SAVE_DIR):
+                if self.offer_choice(['overwrite existing save?'], default=0):
+                    break
+                else:
+                    new_name = self.rename()
         if not new_name:
             return
         nx.write_gml(self.graph, self.SAVE_DIR + self.name)
         self.modified = False
         print('saved!')
 
-    def force_save(self):
-        nx.write_gml(self.graph, self.SAVE_DIR + 'force_save')
-        self.print_red('force-saved!')
+    def auto_save(self):
+        if self.modified:
+            nx.write_gml(self.graph, self.SAVE_DIR + '_auto_save')
+            self.print_red('auto-saved!')
 
     # write to file with timestamp into snapshots folder
     def snapshot(self):
@@ -605,6 +647,8 @@ class Void:
         print('Done Moving!')
 
     def can_delete(self, node):
+        if len(self.nodes()) <= 1:
+            return False
         test_graph = nx.Graph(self.graph.copy())
         test_graph.remove_node(node)
         return nx.is_connected(test_graph)
@@ -612,7 +656,7 @@ class Void:
     # delete the current node - only works if 2 or less neighbors
     def delete_node(self, node):
         if not self.can_delete(node):
-            self.print_red('deleting would disconnect graph - see children')
+            self.print_red('deleting would disconnect graph')
             return
         neighbors = self.neighbors(node)
         self.graph.remove_node(node)
@@ -664,6 +708,8 @@ class Void:
         while True:
             # spit message and take input
             self.print_bold('(? for options): ', end='')
+            # print indentation
+            print('>' * self.indentation, end=' ')
             self.print_green(old)
             if self.contains(old):
                 self.visit(old)
@@ -704,10 +750,12 @@ SESSIONS + SNAPSHOTS:
                 ''')
             # special commands start with /
             elif new and new[0] == '/':
-                if new == '/b':
-                    result = self.traverse_back(old)
-                    if result:
-                        old = result
+                if new in ['/b' * i for i in range(1, 4)]:
+                    # hack to allow multiple backs in one line
+                    for i in range(len(new) // 2):
+                        result = self.traverse_back(old)
+                        if result:
+                            old = result
                 elif new == '/n' and old:
                     self.print_with_family(old)
                 elif new == '/r' and old:
@@ -808,5 +856,5 @@ if __name__ == '__main__':
     try:
         void.loop()
     except Exception:
-        void.force_save()
+        void.auto_save()
         print(traceback.format_exc())
