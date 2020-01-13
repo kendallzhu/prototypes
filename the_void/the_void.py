@@ -258,7 +258,8 @@ class Void:
         if (not name) and default:
             print(default)
             name = default
-        if not name or '/' in name or '.' in name or '\\' in name:
+        if not name or '/' in name or '.' in name or '\\' in name or \
+           '?' in name:
             self.print_red('invalid file name, aborting\n')
             return None
         return name
@@ -370,7 +371,7 @@ class Void:
     def primary_node(self):
         return self.nodes()[0]
 
-    def auto_traverse(self, node=None):
+    def auto_traverse(self, node=None, restriction=None):
         if self.is_empty():
             return ''
         if not self.contains(node) or not self.neighbors(node):
@@ -389,6 +390,12 @@ class Void:
             visited,
             key=lambda n:
             (self.num_visits[n], n in self.children(node), n in self.parents(node)))
+        # filter by restriction
+        if restriction == 'child':
+            options = list(filter(lambda n: n in self.children(node), options))
+        if restriction == 'parent':
+            options = list(filter(lambda n: n in self.parents(node), options))
+        options.append(node)
         choice = options[0]
         self.update_indentation(node, choice)
         return choice
@@ -550,7 +557,7 @@ class Void:
 
     def delete_snapshot(self):
         if self.name not in self.saved_sessions(self.SNAPSHOT_DIR):
-            self.print_red('snapshot aborted')
+            self.print_red('snapshot not found')
             return
         if self.offer_choice(['delete this snapshot?'], default=0):
             os.remove(self.SNAPSHOT_DIR + self.name)
@@ -832,11 +839,15 @@ SESSIONS + SNAPSHOTS:
             # normal input
             elif type(new) == str and new.strip() == '':
                 old = self.auto_traverse(old)
+            elif new == '>':
+                old = self.auto_traverse(node=old, restriction='child')
             elif new and new[0] == '>':
                 child = new[1:]
                 if self.add_node(child, old, "child"):
                     self.print_purple("added as child!")
                     old = child
+            elif new == '<':
+                old = self.auto_traverse(node=old, restriction='parent')
             elif new and new[0] == '<':
                 parent = new[1:]
                 if self.add_node(parent, old, "parent"):
