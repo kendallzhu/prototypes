@@ -9,6 +9,13 @@ from colorama import init, Fore, Style
 import matplotlib
 matplotlib.use('TkAgg')
 
+# text to speech
+import pyttsx3
+tts_engine = pyttsx3.init()
+tts_engine.setProperty('volume', .7)
+tts_engine.setProperty('rate', 175)
+tts_engine.say('Welcome to The Void')
+tts_engine.runAndWait()
 
 # undirected graph of thoughts/ideas/questions
 class Void:
@@ -17,6 +24,7 @@ class Void:
 
     def __init__(self):
         self.modified = False
+        self.is_voice = False
         self.name = ''
         # nodes are strings
         self.graph = nx.DiGraph()
@@ -709,6 +717,11 @@ class Void:
     def __str__(self):
         return self.recap()
 
+    def read_if_voice(self, text):
+        if self.is_voice and text:
+            tts_engine.say(text)
+            tts_engine.runAndWait()
+    
     def loop(self):
         self.print_welcome()
         old = ''
@@ -737,6 +750,7 @@ NAVIGATION:
     /p  - pick any a node (tournament-style)
     /pc - pick a child (tournament-style)
     /ps - pick a sibling (tournament-style)
+    /v  - toggle text to speech
 
 BASIC OPERATIONS:
     /e  - edit node
@@ -769,6 +783,9 @@ SESSIONS + SNAPSHOTS:
                     result = self.choose_recent()
                     if result:
                         old = result
+                elif new == '/v' and old:
+                    self.is_voice = not self.is_voice
+                    self.read_if_voice(old)
                 elif new == '/g':
                     self.draw()
                 elif new == '/e':
@@ -839,8 +856,10 @@ SESSIONS + SNAPSHOTS:
             # normal input
             elif type(new) == str and new.strip() == '':
                 old = self.auto_traverse(old)
+                self.read_if_voice(old)
             elif new == '>':
                 old = self.auto_traverse(node=old, restriction='child')
+                self.read_if_voice(old)
             elif new and new[0] == '>':
                 child = new[1:]
                 if self.add_node(child, old, "child"):
@@ -848,6 +867,7 @@ SESSIONS + SNAPSHOTS:
                     old = child
             elif new == '<':
                 old = self.auto_traverse(node=old, restriction='parent')
+                self.read_if_voice(old)
             elif new and new[0] == '<':
                 parent = new[1:]
                 if self.add_node(parent, old, "parent"):
