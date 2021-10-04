@@ -24,7 +24,7 @@ class Void:
 
     def __init__(self):
         self.modified = False
-        self.is_voice = False
+        self.is_voice = True
         self.name = ''
         # nodes are strings
         self.graph = nx.DiGraph()
